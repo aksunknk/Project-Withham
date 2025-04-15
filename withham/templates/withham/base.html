@@ -1,0 +1,68 @@
+{# withham/templates/withham/base.html #}
+{% load static %} {# staticタグを使う場合 #}
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {# 各ページで設定するタイトルブロック、デフォルトは'withham' #}
+    <title>{% block title %}withham{% endblock %}</title>
+
+    {# Bootstrap CSS (CDN) #}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+
+    {# (オプション) Bootstrap Icons (CDN) - アイコンを使いたい場合 #}
+    {# <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"> #}
+
+    {# 各ページで追加の<head>要素を挿入するためのブロック #}
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+    {# --- ヘッダー --- #}
+    <header class="py-2 mb-4 border-bottom bg-light sticky-top"> {# 上部に固定する場合 sticky-top を追加 #}
+        <div class="container d-flex flex-wrap justify-content-between align-items-center">
+            {# サイトタイトル（トップページへのリンク） #}
+            <h1><a href="{% url 'withham:index' %}" class="text-dark text-decoration-none fs-4">withham</a></h1> {# fs-4で少し大きく #}
+
+            {# ナビゲーション（ログイン状態に応じて変化） #}
+            <nav>
+                {% if user.is_authenticated %}
+                    <span class="me-2 d-none d-sm-inline">こんにちは、{{ user.username }} さん</span> {# スマホでは非表示にする例 #}
+                    <a href="{% url 'withham:profile_detail' user.pk %}" class="btn btn-sm btn-outline-info me-2">マイページ</a>
+                    <a href="{% url 'withham:post_create' %}" class="btn btn-sm btn-primary me-2">新規投稿</a>
+                    <a href="{% url 'withham:hamster_create' %}" class="btn btn-sm btn-outline-secondary me-2">ﾊﾑ登録</a> {# 短縮表示例 #}
+                    <a href="{% url 'withham:logout' %}" class="btn btn-sm btn-outline-danger">ﾛｸﾞｱｳﾄ</a> {# 短縮表示例 #}
+                {% else %}
+                    <a href="{% url 'withham:login' %}" class="btn btn-sm btn-success">ログイン</a>
+                    {# <a href="#" class="btn btn-sm btn-warning ms-2">新規登録</a> #}
+                {% endif %}
+            </nav>
+        </div>
+    </header>
+
+    {# --- メインコンテンツ (中央カラムレイアウト) --- #}
+    <div class="container mt-4">
+        <div class="row justify-content-center">
+            <div class="col-md-9 col-lg-7 col-xl-6"> {# カラム幅を調整 (md, lg, xl で指定) #}
+                <main>
+                    {# 各ページ固有のコンテンツがこのブロックに挿入される #}
+                    {% block content %}
+                    {% endblock %}
+                </main>
+            </div>
+        </div>
+    </div>
+
+    {# --- フッター --- #}
+    <footer class="py-3 my-4 border-top text-center text-muted">
+        <p class="mb-0">&copy; {% now "Y" %} withham</p>
+    </footer>
+
+    {# Bootstrap JavaScript Bundle (Popperを含む) - Dropdownなどの機能に必要 #}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+
+    {# 各ページで追加のJavaScriptを読み込むためのブロック #}
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

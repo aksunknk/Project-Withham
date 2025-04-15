@@ -1,0 +1,15 @@
+{# withham/templates/withham/hamster_form.html を新規作成 #}
+
+{% extends "withham/base.html" %} {# ベーステンプレートを継承 #}
+
+{% block title %}ハムスター情報{% if form.instance.pk %}編集{% else %}登録{% endif %} - withham{% endblock %}
+
+{% block content %}
+    <h2>ハムスター情報{% if form.instance.pk %}編集{% else %}登録{% endif %}</h2>
+    {# 画像を扱うので enctype が必要 #}
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.as_p }} {# フォームを段落形式で表示 #}
+        <button type="submit">{% if form.instance.pk %}更新する{% else %}登録する{% endif %}</button>
+    </form>
+{% endblock %}

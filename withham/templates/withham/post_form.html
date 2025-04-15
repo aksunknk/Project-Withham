@@ -1,0 +1,91 @@
+{# withham/templates/withham/post_form.html #}
+
+{% extends "withham/base.html" %} {# ベーステンプレートを継承 #}
+{% load static %} {# 必要に応じて #}
+
+{% block title %}新規投稿 - withham{% endblock %} {# ページのタイトル #}
+
+{% block content %} {# contentブロックを上書き #}
+    <div class="col-md-8 offset-md-2"> {# コンテンツ幅を中央寄せで調整（任意） #}
+        <h2 class="mb-4">新規投稿</h2>
+
+        {# 画像アップロードがあるので enctype="multipart/form-data" が必須 #}
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %} {# CSRF対策 #}
+
+            {# フォーム全体のエラー表示 #}
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger" role="alert">
+                    {% for error in form.non_field_errors %}
+                        <p class="mb-0">{{ error }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            {# テキスト入力フィールド #}
+            <div class="mb-3">
+                <label for="{{ form.text.id_for_label }}" class="form-label">{{ form.text.label }}</label>
+                {# <textarea> タグを直接記述してクラスを適用 #}
+                <textarea name="{{ form.text.name }}" id="{{ form.text.id_for_label }}"
+                          class="form-control {% if form.text.errors %}is-invalid{% endif %}"
+                          rows="4">{{ form.text.value|default_if_none:"" }}</textarea>
+                {% if form.text.errors %}
+                    <div class="invalid-feedback">
+                        {% for error in form.text.errors %}{{ error }}{% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
+            {# 画像アップロードフィールド #}
+            <div class="mb-3">
+                <label for="{{ form.image.id_for_label }}" class="form-label">{{ form.image.label }}</label>
+                {# <input type="file"> タグを直接記述してクラスを適用 #}
+                <input type="file" name="{{ form.image.name }}" id="{{ form.image.id_for_label }}"
+                       class="form-control {% if form.image.errors %}is-invalid{% endif %}">
+                {% if form.image.errors %}
+                    <div class="invalid-feedback">
+                        {% for error in form.image.errors %}{{ error }}{% endfor %}
+                    </div>
+                {% endif %}
+                 {# 画像が既に選択されている場合の表示（編集時など） #}
+                {% if form.instance.image %}
+                <div class="mt-2">
+                    現在の画像: <a href="{{ form.instance.image.url }}" target="_blank">{{ form.instance.image.name }}</a>
+                    {# チェックボックスで画像をクリアする機能（forms.pyでの対応も必要） #}
+                    {# {{ form.image }} #}
+                </div>
+                {% endif %}
+            </div>
+
+            {# ハムスター選択フィールド #}
+            <div class="mb-3">
+                <label for="{{ form.hamster.id_for_label }}" class="form-label">{{ form.hamster.label }}</label>
+                 {# <select> タグを直接記述してクラスを適用 #}
+                <select name="{{ form.hamster.name }}" id="{{ form.hamster.id_for_label }}"
+                        class="form-select {% if form.hamster.errors %}is-invalid{% endif %}">
+                    {# value が空の選択肢を追加（任意選択の場合） #}
+                    {% if form.hamster.field.required == False or form.hamster.field.empty_label %}
+                    <option value="" {% if not form.hamster.value %}selected{% endif %}>---------</option>
+                    {% endif %}
+                    {# 選択肢をループで表示 #}
+                    {% for value, text in form.hamster.field.choices %}
+                        {% if value %} {# 空の選択肢以外 #}
+                        <option value="{{ value }}" {% if form.hamster.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>{{ text }}</option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+                {% if form.hamster.errors %}
+                    <div class="invalid-feedback">
+                        {% for error in form.hamster.errors %}{{ error }}{% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
+            {# 送信ボタン #}
+            <div class="d-grid gap-2"> {# ボタンを横幅いっぱいに表示（任意）#}
+                <button type="submit" class="btn btn-primary">投稿する</button>
+            </div>
+
+        </form>
+    </div>
+{% endblock %}

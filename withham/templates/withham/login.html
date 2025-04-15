@@ -1,0 +1,48 @@
+{# withham/templates/withham/login.html の確認ポイント #}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ログイン - withham</title>
+    {# スタイルなど #}
+</head>
+<body>
+    <h2>ログイン</h2>
+
+    {# エラー表示 (任意) #}
+    {% if form.errors %}
+        <ul class="errorlist">
+            <li>ユーザー名またはパスワードが正しくありません。</li>
+        </ul>
+    {% endif %}
+
+    {# ↓↓↓★ここから下のフォーム部分が特に重要★↓↓↓ #}
+    <form method="post" action="{% url 'withham:login' %}">
+        {% csrf_token %} {# CSRF対策: 必ず必要 #}
+
+        {# --- フォームの入力欄を表示する部分 --- #}
+        {# 一番簡単な表示方法: #}
+        {{ form.as_p }}
+
+        {# または、フィールドごとに表示する場合:
+        <div class="form-group">
+            <label for="{{ form.username.id_for_label }}">ユーザー名:</label>
+            {{ form.username }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.password.id_for_label }}">パスワード:</label>
+            {{ form.password }}
+        </div>
+        #}
+        {# --- ここまで --- #}
+
+        <button type="submit">ログイン</button>
+
+        <input type="hidden" name="next" value="{{ next }}">
+    </form>
+    {# ↑↑↑★ここまで★↑↑↑ #}
+
+    {# 他のリンク (任意) #}
+
+</body>
+</html>
