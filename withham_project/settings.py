@@ -46,7 +46,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',    # セッションフレームワーク
     'django.contrib.messages',    # メッセージングフレームワーク
     'django.contrib.staticfiles', # 静的ファイル管理
+<<<<<<< HEAD
     'withham',                    # ★作成した withham アプリを追加
+=======
+    'django.contrib.humanize',
+    'withham',                    # ★作成した withham アプリを追加
+    
+>>>>>>> b6e6bb3 (no message)
 ]
 
 # ミドルウェア：リクエスト/レスポンス処理の間に挟まる処理を定義します
@@ -149,4 +155,17 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_REDIRECT_URL = '/' # トップページにリダイレクトする場合
 
 # ログアウト成功後のリダイレクト先URL (任意)
+<<<<<<< HEAD
 # LOGOUT_REDIRECT_URL = '/login/' # ログアウト後にログインページに戻る場合
+=======
+# LOGOUT_REDIRECT_URL = '/login/' # ログアウト後にログインページに戻る場合
+
+# --- メディアファイル設定 ---
+# アップロードされたファイルを提供するURL (末尾のスラッシュが重要)
+MEDIA_URL = '/media/'
+
+# アップロードされたファイルを実際に保存するサーバー上のディレクトリパス
+# BASE_DIR は settings.py の上部で定義されているはず
+MEDIA_ROOT = BASE_DIR / 'media'
+# または import os して os.path.join(BASE_DIR, 'media') でも可
+>>>>>>> b6e6bb3 (no message)

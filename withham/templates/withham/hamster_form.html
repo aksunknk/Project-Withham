@@ -1,10 +1,18 @@
+<<<<<<< HEAD
 {# withham/templates/withham/hamster_form.html を新規作成 #}
 
 {% extends "withham/base.html" %} {# ベーステンプレートを継承 #}
+=======
+{# withham/templates/withham/hamster_form.html (Tailwind CSS適用版) #}
+
+{% extends "withham/base.html" %} {# Tailwind適用済みのbase.htmlを継承 #}
+{% load static %}
+>>>>>>> b6e6bb3 (no message)
 
 {% block title %}ハムスター情報{% if form.instance.pk %}編集{% else %}登録{% endif %} - withham{% endblock %}
 
 {% block content %}
+<<<<<<< HEAD
     <h2>ハムスター情報{% if form.instance.pk %}編集{% else %}登録{% endif %}</h2>
     {# 画像を扱うので enctype が必要 #}
     <form method="post" enctype="multipart/form-data">
@@ -13,3 +21,150 @@
         <button type="submit">{% if form.instance.pk %}更新する{% else %}登録する{% endif %}</button>
     </form>
 {% endblock %}
+=======
+<div class="max-w-xl mx-auto mt-8 px-4"> {# フォーム全体のコンテナ #}
+    <div class="bg-white p-6 md:p-8 rounded-xl shadow-md border border-gray-200"> {# カード風スタイル #}
+        <h2 class="text-2xl font-bold text-center text-[#1c140d] mb-6">ハムスター情報{% if form.instance.pk %}編集{% else %}登録{% endif %}</h2>
+
+        {# 画像を扱うので enctype="multipart/form-data" が必須 #}
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %} {# CSRF対策 #}
+
+            {# フォーム全体のエラー表示 #}
+            {% if form.non_field_errors %}
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+                    <strong class="font-bold">エラー:</strong>
+                    <ul class="mt-1 list-disc list-inside text-sm">
+                    {% for error in form.non_field_errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+
+            {# --- 名前フィールド (Text Input) --- #}
+            <div class="mb-4">
+                <label for="{{ form.name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">{{ form.name.label|default:"名前" }}</label>
+                <input type="text" name="{{ form.name.name }}" id="{{ form.name.id_for_label }}"
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#f2800d] focus:ring focus:ring-[#f2800d] focus:ring-opacity-50 {% if form.name.errors %}border-red-500{% endif %}"
+                       value="{{ form.name.value|default_if_none:"" }}"
+                       required maxlength="{{ form.name.field.max_length }}"> {# required, maxlength を追加 #}
+                {% if form.name.errors %}
+                    <p class="mt-1 text-xs text-red-600">
+                        {% for error in form.name.errors %}{{ error }}{% endfor %}
+                    </p>
+                {% endif %}
+            </div>
+
+            {# --- 種類フィールド (Text Input) --- #}
+            <div class="mb-4">
+                <label for="{{ form.breed.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">{{ form.breed.label|default:"種類" }}</label>
+                <input type="text" name="{{ form.breed.name }}" id="{{ form.breed.id_for_label }}"
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#f2800d] focus:ring focus:ring-[#f2800d] focus:ring-opacity-50 {% if form.breed.errors %}border-red-500{% endif %}"
+                       value="{{ form.breed.value|default_if_none:"" }}"
+                       maxlength="{{ form.breed.field.max_length }}">
+                {% if form.breed.errors %}
+                    <p class="mt-1 text-xs text-red-600">
+                        {% for error in form.breed.errors %}{{ error }}{% endfor %}
+                    </p>
+                {% endif %}
+            </div>
+
+            {# --- 誕生日フィールド (Date Input) --- #}
+            <div class="mb-4">
+                <label for="{{ form.birthday.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">{{ form.birthday.label|default:"誕生日" }}</label>
+                {# type="date" を直接指定 #}
+                <input type="date" name="{{ form.birthday.name }}" id="{{ form.birthday.id_for_label }}"
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#f2800d] focus:ring focus:ring-[#f2800d] focus:ring-opacity-50 {% if form.birthday.errors %}border-red-500{% endif %}"
+                       value="{{ form.birthday.value|date:'Y-m-d'|default_if_none:"" }}"> {# valueの形式を YYYY-MM-DD に #}
+                {% if form.birthday.errors %}
+                    <p class="mt-1 text-xs text-red-600">
+                        {% for error in form.birthday.errors %}{{ error }}{% endfor %}
+                    </p>
+                {% endif %}
+            </div>
+
+            {# --- 性別フィールド (Select) --- #}
+            <div class="mb-4">
+                <label for="{{ form.gender.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">{{ form.gender.label|default:"性別" }}</label>
+                <select name="{{ form.gender.name }}" id="{{ form.gender.id_for_label }}"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#f2800d] focus:ring focus:ring-[#f2800d] focus:ring-opacity-50 {% if form.gender.errors %}border-red-500{% endif %}">
+                    {# 選択肢をループで表示 #}
+                    {% for value, text in form.gender.field.choices %}
+                        <option value="{{ value }}" {% if form.gender.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>{{ text }}</option>
+                    {% endfor %}
+                </select>
+                {% if form.gender.errors %}
+                     <p class="mt-1 text-xs text-red-600">
+                        {% for error in form.gender.errors %}{{ error }}{% endfor %}
+                    </p>
+                {% endif %}
+            </div>
+
+             {# --- プロフィール文フィールド (Textarea) --- #}
+            <div class="mb-4">
+                <label for="{{ form.profile_text.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">{{ form.profile_text.label|default:"プロフィール" }}</label>
+                <textarea name="{{ form.profile_text.name }}" id="{{ form.profile_text.id_for_label }}"
+                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#f2800d] focus:ring focus:ring-[#f2800d] focus:ring-opacity-50 {% if form.profile_text.errors %}border-red-500{% endif %}"
+                          rows="4">{{ form.profile_text.value|default_if_none:"" }}</textarea>
+                {% if form.profile_text.errors %}
+                    <p class="mt-1 text-xs text-red-600">
+                        {% for error in form.profile_text.errors %}{{ error }}{% endfor %}
+                    </p>
+                {% endif %}
+            </div>
+
+            {# --- プロフィール画像フィールド (File Input) --- #}
+            <div class="mb-6">
+                <label for="{{ form.profile_image.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">{{ form.profile_image.label|default:"プロフィール画像" }}</label>
+                {# 編集時用に現在の画像を表示 #}
+                {% if form.instance.pk and form.instance.profile_image %}
+                <div class="mt-1 mb-2">
+                    <img src="{{ form.instance.profile_image.url }}" alt="現在の画像" class="h-20 w-20 rounded-md object-cover inline-block">
+                    <span class="text-xs text-gray-500 ml-2">現在の画像</span>
+                     {# 画像クリア用チェックボックス（forms.pyでの対応も必要） #}
+                     {# {{ form.profile_image }} #}
+                </div>
+                {% endif %}
+                <input type="file" name="{{ form.profile_image.name }}" id="{{ form.profile_image.id_for_label }}" accept="image/*"
+                       class="mt-1 block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#f4ede7] file:text-[#1c140d] hover:file:bg-[#e7d8c9] {% if form.profile_image.errors %}border-red-500{% endif %}">
+                {% if form.profile_image.errors %}
+                    <p class="mt-1 text-xs text-red-600">
+                        {% for error in form.profile_image.errors %}{{ error }}{% endfor %}
+                    </p>
+                {% endif %}
+            </div>
+
+            {# --- 送信ボタン --- #}
+            <div class="mt-6">
+                <button type="submit"
+                        class="w-full py-2 px-4 bg-[#f2800d] hover:opacity-90 text-[#1c140d] font-semibold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-[#f2800d] focus:ring-offset-2 focus:ring-offset-white">
+                    {% if form.instance.pk %}更新する{% else %}登録する{% endif %} {# 編集か登録かでボタンテキストを変更 #}
+                </button>
+            </div>
+
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+```
+
+**このコードのポイント:**
+
+* **`base.html` 継承:** Tailwind CSSが適用された `base.html` を継承します。
+* **`enctype="multipart/form-data"`:** プロフィール画像をアップロードするために `<form>` タグに必須です。
+* **フィールドの手動レンダリング:** `HamsterForm` に含まれるすべてのフィールド (`name`, `breed`, `birthday`, `gender`, `profile_text`, `profile_image`) について、HTMLタグを直接記述し、Tailwindクラスを適用しています。
+    * **誕生日:** `type="date"` を指定し、初期値のフォーマットを `Y-m-d` にしています。
+    * **性別:** `<select>` タグと `<option>` タグを使って選択肢を表示しています。
+    * **プロフィール画像:** 編集時に現在の画像を表示する処理を追加しています。
+* **エラー表示:** 各フィールドの下にエラーメッセージを表示する部分もTailwindクラスでスタイリングしています。
+* **ボタン:** 登録時と編集時でボタンのテキストが変わるように `{% if form.instance.pk %}` で条件分岐しています。
+
+**前提:**
+
+* このテンプレートが正しく表示・機能するには、`base.html` がTailwind CSS用に修正されている必要があります。
+* 対応するビュー (`views.hamster_create` や、今後作成する `views.hamster_edit`) が、`HamsterForm` のインスタンスを `'form'` というキー名でコンテキストとして渡している必要があります。編集の場合は `instance` 引数も渡します。
+
+このコードを `withham/templates/withham/hamster_form.html` として保存・配置し、ブラウザでハムスター登録ページ (`/hamsters/new/`) や編集ページ（今後作成）を表示して確認してみてくだ
+>>>>>>> b6e6bb3 (no message)
