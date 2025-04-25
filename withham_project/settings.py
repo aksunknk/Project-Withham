@@ -27,7 +27,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ここにはDjangoが自動生成した実際のシークレットキーが入ります。
 # 絶対に公開しないでください。
 # ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-SECRET_KEY = 'django-insecure-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' # ご自身のキーに置き換えてください
+SECRET_KEY = 'django-insecure-your-secret-key-here'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # 開発中はTrue、本番環境ではFalseにします
@@ -46,13 +46,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',    # セッションフレームワーク
     'django.contrib.messages',    # メッセージングフレームワーク
     'django.contrib.staticfiles', # 静的ファイル管理
-<<<<<<< HEAD
-    'withham',                    # ★作成した withham アプリを追加
-=======
     'django.contrib.humanize',
     'withham',                    # ★作成した withham アプリを追加
     
->>>>>>> b6e6bb3 (no message)
 ]
 
 # ミドルウェア：リクエスト/レスポンス処理の間に挟まる処理を定義します
@@ -155,9 +151,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_REDIRECT_URL = '/' # トップページにリダイレクトする場合
 
 # ログアウト成功後のリダイレクト先URL (任意)
-<<<<<<< HEAD
-# LOGOUT_REDIRECT_URL = '/login/' # ログアウト後にログインページに戻る場合
-=======
 # LOGOUT_REDIRECT_URL = '/login/' # ログアウト後にログインページに戻る場合
 
 # --- メディアファイル設定 ---
@@ -168,4 +161,3 @@ MEDIA_URL = '/media/'
 # BASE_DIR は settings.py の上部で定義されているはず
 MEDIA_ROOT = BASE_DIR / 'media'
 # または import os して os.path.join(BASE_DIR, 'media') でも可
->>>>>>> b6e6bb3 (no message)
