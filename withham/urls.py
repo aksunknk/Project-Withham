@@ -19,11 +19,7 @@ urlpatterns = [
     path('hamsters/new/', views.hamster_create, name='hamster_create'),
     # ★ プロフィール詳細ページのURLパターンを追加 (<int:pk> で整数値をpkとして受け取る)
     path('users/<int:pk>/', views.profile_detail, name='profile_detail'), 
-<<<<<<< HEAD
     # ★ プロフィール編集ページのURLパターンを追加
-=======
-      # ★ プロフィール編集ページのURLパターンを追加
->>>>>>> ddb4b7b7eafd9da8db9f8206bcdeba3747b626b2
     path('profile/edit/', views.profile_edit, name='profile_edit'),
     # withham/urls.py 内
     path('post/<int:pk>/', views.post_detail, name='post_detail'),
