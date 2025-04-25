@@ -27,7 +27,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ここにはDjangoが自動生成した実際のシークレットキーが入ります。
 # 絶対に公開しないでください。
 # ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-SECRET_KEY = 'django-insecure-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' # ご自身のキーに置き換えてください
+SECRET_KEY = 'django-insecure-your-secret-key-here'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # 開発中はTrue、本番環境ではFalseにします
@@ -46,8 +46,14 @@ INSTALLED_APPS = [
     'django.contrib.sessions',    # セッションフレームワーク
     'django.contrib.messages',    # メッセージングフレームワーク
     'django.contrib.staticfiles', # 静的ファイル管理
+<<<<<<< HEAD
     'django.contrib.humanize',    # 人間が読みやすい形式への変換
     'withham',                    # ★作成した withham アプリを追加
+=======
+    'django.contrib.humanize',
+    'withham',                    # ★作成した withham アプリを追加
+    
+>>>>>>> ddb4b7b7eafd9da8db9f8206bcdeba3747b626b2
 ]
 
 # ミドルウェア：リクエスト/レスポンス処理の間に挟まる処理を定義します

@@ -3,10 +3,18 @@
 from django.db import models
 from django.contrib.auth.models import User # Django標準のユーザーモデル
 from django.utils import timezone # タイムゾーン対応の日時
+<<<<<<< HEAD
 # ★ シグナルを使うためにインポート
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
+=======
+# ★ シグナルを使うためにインポート (ステップ2で説明)
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+
+>>>>>>> ddb4b7b7eafd9da8db9f8206bcdeba3747b626b2
 class Hamster(models.Model):
     """ハムスターのモデル"""
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='hamsters', verbose_name='飼い主')
@@ -43,6 +51,10 @@ class Post(models.Model):
     # related_name='liked_posts' で user.liked_posts.all() のように逆参照できる
     likes = models.ManyToManyField(User, related_name='liked_posts', blank=True, verbose_name='いいねしたユーザー')
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> ddb4b7b7eafd9da8db9f8206bcdeba3747b626b2
     def __str__(self):
         return f'Post by {self.author.username} at {self.created_at.strftime("%Y-%m-%d %H:%M")}'
 
@@ -126,3 +138,7 @@ class HealthLog(models.Model):
 
     def __str__(self):
         return f"{self.hamster.name} - {self.log_date.strftime('%Y-%m-%d')}"
+<<<<<<< HEAD
+=======
+
+>>>>>>> ddb4b7b7eafd9da8db9f8206bcdeba3747b626b2

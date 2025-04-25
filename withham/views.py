@@ -158,3 +158,12 @@ def health_log_create(request, hamster_pk):
         'hamster': hamster,
     }
     return render(request, 'withham/health_log_form.html', context)
+<<<<<<< HEAD
+=======
+
+# --- 今後、ハムスター詳細・編集・削除などのビューもここに追加 ---
+# def hamster_detail(request, pk): ...
+# def hamster_edit(request, pk): ...
+# def hamster_delete(request, pk): ...
+
+>>>>>>> ddb4b7b7eafd9da8db9f8206bcdeba3747b626b2
