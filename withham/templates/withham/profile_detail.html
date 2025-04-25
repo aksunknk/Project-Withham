@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 {# withham/templates/withham/profile_detail.html (ハムスター一覧追加版) #}
-=======
-{# withham/templates/withham/profile_detail.html (健康記録リンク追加) #}
->>>>>>> ddb4b7b7eafd9da8db9f8206bcdeba3747b626b2
 
 {% extends "withham/base.html" %} {# Tailwind適用済みのbase.htmlを継承 #}
 {% load static %} {# デフォルトアバター/ハムスター画像表示のために static をロード #}
@@ -13,11 +9,7 @@
 {% block content %} {# contentブロックを上書き #}
 
     {# --- プロフィールヘッダー情報 --- #}
-<<<<<<< HEAD
     <div class="profile-header mb-6 p-4 sm:p-6 bg-white rounded-xl shadow-sm border border-gray-200"> {# スタイル調整 #}
-=======
-    <div class="profile-header mb-6 p-4 sm:p-6 bg-white rounded-xl shadow-sm border border-gray-200">
->>>>>>> ddb4b7b7eafd9da8db9f8206bcdeba3747b626b2
         <div class="flex flex-col sm:flex-row items-center">
             {# アバター画像 #}
             <div class="flex-shrink-0 mb-4 sm:mb-0 sm:mr-6">
@@ -63,7 +55,7 @@
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"> {# Tailwind Gridで配置 #}
             {% for hamster in hamsters %} {# ★ ビューから 'hamsters' を渡す必要あり #}
                 <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200 text-center">
-                    <a href="#" class="block group relative"> {# ハムスター詳細へのリンク (仮) #}
+                    <a href="{% url 'withham:health_log_list' hamster.pk %}" class="text-decoration-none stretched-link">{{ hamster.name }}</a>
                         {% if hamster.profile_image %}
                             <img src="{{ hamster.profile_image.url }}" class="w-full aspect-square object-cover group-hover:opacity-90 transition-opacity" alt="{{ hamster.name }}">
                         {% else %}

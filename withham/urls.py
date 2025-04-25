@@ -27,4 +27,5 @@ urlpatterns = [
     path('post/<int:post_id>/like/', views.toggle_like, name='toggle_like'),
     # ★ 健康記録登録ページのURLパターンを追加 (<int:hamster_pk> でハムスターIDを受け取る)
     path('hamsters/<int:hamster_pk>/log/new/', views.health_log_create, name='health_log_create'),
+    path('hamsters/<int:hamster_pk>/logs/', views.health_log_list, name='health_log_list'),
 ]

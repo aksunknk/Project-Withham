@@ -46,14 +46,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',    # セッションフレームワーク
     'django.contrib.messages',    # メッセージングフレームワーク
     'django.contrib.staticfiles', # 静的ファイル管理
-<<<<<<< HEAD
     'django.contrib.humanize',    # 人間が読みやすい形式への変換
     'withham',                    # ★作成した withham アプリを追加
-=======
-    'django.contrib.humanize',
-    'withham',                    # ★作成した withham アプリを追加
-    
->>>>>>> ddb4b7b7eafd9da8db9f8206bcdeba3747b626b2
 ]
 
 # ミドルウェア：リクエスト/レスポンス処理の間に挟まる処理を定義します

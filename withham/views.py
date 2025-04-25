@@ -112,35 +112,33 @@ def post_detail(request, pk):
     }
     return render(request, 'withham/post_detail.html', context)
 
-# --- いいね処理 ---
+# --- いいね/いいね解除 処理 ---
 @login_required
 @require_POST
 def toggle_like(request, post_id):
-    """投稿へのいいね・いいね解除を処理"""
-    post = get_object_or_404(Post, pk=post_id)
-    user = request.user
-    is_liked = False
+    """いいねの追加/削除を行い、JSONレスポンスを返す"""
+    try:
+        post = get_object_or_404(Post, id=post_id)
+        user = request.user
+        liked = False
 
-    if post.likes.filter(id=user.id).exists():
-        post.likes.remove(user)
-        is_liked = False
-    else:
-        post.likes.add(user)
-        is_liked = True
-
-    return JsonResponse({
-        'is_liked': is_liked,
-        'likes_count': post.likes.count(),
-    })
+        if post.likes.filter(id=user.id).exists():
+            post.likes.remove(user)
+            liked = False
+        else:
+            post.likes.add(user)
+            liked = True
+        # いいね数を正確に取得するために再カウント
+        likes_count = post.likes.count()
+        return JsonResponse({'liked': liked, 'likes_count': likes_count})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
 
 # --- 健康記録登録 ---
 @login_required
 def health_log_create(request, hamster_pk):
-    """健康記録登録ページ・処理"""
-    hamster = get_object_or_404(Hamster, pk=hamster_pk)
-    # ハムスターの飼い主でない場合はアクセス拒否
-    if hamster.owner != request.user:
-        return HttpResponseForbidden("このハムスターの健康記録は登録できません。")
+    """特定のハムスターの健康記録を登録する"""
+    hamster = get_object_or_404(Hamster, pk=hamster_pk, owner=request.user)
 
     if request.method == 'POST':
         form = HealthLogForm(request.POST)
@@ -149,21 +147,35 @@ def health_log_create(request, hamster_pk):
             health_log.hamster = hamster
             health_log.recorded_by = request.user
             health_log.save()
-            return redirect('withham:profile_detail', pk=request.user.pk)
+            # 登録後は、そのハムスターの記録一覧ページへリダイレクト (★変更)
+            return redirect('withham:health_log_list', hamster_pk=hamster.pk)
     else:
-        form = HealthLogForm()
+        # GETリクエスト: フォームを初期化（記録日のデフォルトを今日に）
+        form = HealthLogForm(initial={'log_date': timezone.now().date()})
 
     context = {
         'form': form,
         'hamster': hamster,
     }
     return render(request, 'withham/health_log_form.html', context)
-<<<<<<< HEAD
-=======
+
+# --- 健康記録一覧 ---
+def health_log_list(request, hamster_pk):
+    """特定のハムスターの健康記録一覧を表示する"""
+    # URLから渡されたpkを使って対象のハムスターを取得
+    # ログインしていなくても見れるように owner=request.user は外す (任意)
+    hamster = get_object_or_404(Hamster, pk=hamster_pk)
+    # そのハムスターの健康記録を新しい順で取得
+    health_logs = hamster.health_logs.all().order_by('-log_date', '-created_at')
+
+    context = {
+        'hamster': hamster,
+        'health_logs': health_logs,
+    }
+    return render(request, 'withham/health_log_list.html', context)
 
 # --- 今後、ハムスター詳細・編集・削除などのビューもここに追加 ---
 # def hamster_detail(request, pk): ...
 # def hamster_edit(request, pk): ...
 # def hamster_delete(request, pk): ...
 
->>>>>>> ddb4b7b7eafd9da8db9f8206bcdeba3747b626b2

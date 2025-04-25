@@ -1,0 +1,82 @@
+{# withham/templates/withham/health_log_list.html (Tailwind CSS適用版) #}
+
+{% extends "withham/base.html" %} {# Tailwind適用済みのbase.htmlを継承 #}
+{% load static %}
+{% load humanize %} {# timesince などを使う場合 #}
+
+{% block title %}{{ hamster.name }} の健康記録一覧 - withham{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto mt-8 px-4"> {# コンテンツ幅を調整 #}
+    {# --- ヘッダー: ハムスター情報と新規記録ボタン --- #}
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 pb-4 border-b border-gray-200">
+        <div class="flex items-center gap-3">
+            {% if hamster.profile_image %}
+                <img src="{{ hamster.profile_image.url }}" class="h-16 w-16 rounded-full object-cover border border-gray-200" alt="{{ hamster.name }}">
+            {% else %}
+                <img src="{% static 'images/default_hamster_icon.svg' %}" class="h-16 w-16 rounded-full object-contain bg-gray-100 p-2 border border-gray-200" alt="デフォルト画像">
+            {% endif %}
+            <h2 class="text-2xl font-bold text-[#1c140d]">
+                <a href="#" class="hover:underline">{{ hamster.name }}</a> の記録
+            </h2>
+        </div>
+        {# 飼い主のみ新規記録ボタンを表示 #}
+        {% if request.user == hamster.owner %}
+        <a href="{% url 'withham:health_log_create' hamster.pk %}" class="inline-block bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg text-sm flex-shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" class="inline-block mr-1 -mt-1" viewBox="0 0 16 16">
+              <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+              <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+            </svg>
+            新しい記録を追加
+        </a>
+        {% endif %}
+    </div>
+
+    {# --- 健康記録一覧 --- #}
+    <div class="space-y-4">
+        {% for log in health_logs %}
+            <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                <div class="flex justify-between items-baseline mb-2">
+                    {# 記録日 #}
+                    <h4 class="font-semibold text-lg text-[#1c140d]">{{ log.log_date|date:"Y年n月j日(D)" }}</h4>
+                    {# 編集・削除ボタン (機能は未実装) #}
+                    {% if request.user == hamster.owner %}
+                    <div class="text-xs">
+                        <a href="#" class="text-blue-600 hover:underline mr-2">編集</a>
+                        <a href="#" class="text-red-600 hover:underline">削除</a>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {# 体重 #}
+                {% if log.weight_g is not None %} {# Noneでないことを確認 #}
+                <p class="text-base text-gray-800 mb-1">
+                    <strong class="font-medium">体重:</strong> {{ log.weight_g }} g
+                </p>
+                {% endif %}
+
+                {# 様子・メモ #}
+                {% if log.notes %}
+                <div class="text-sm text-gray-700 leading-relaxed mt-2 pt-2 border-t border-gray-100">
+                    <p class="font-medium mb-1">様子・メモ:</p>
+                    <p>{{ log.notes|linebreaksbr }}</p>
+                </div>
+                {% endif %}
+
+                {# 記録日時 (任意表示) #}
+                {# <p class="text-xs text-gray-400 text-right mt-2">記録作成: {{ log.created_at|date:"y/m/d H:i" }}</p> #}
+            </div>
+        {% empty %}
+            <div class="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-lg relative text-center" role="alert">
+                <p>まだ健康記録がありません。</p>
+                {% if request.user == hamster.owner %}
+                <a href="{% url 'withham:health_log_create' hamster.pk %}" class="mt-2 inline-block bg-green-100 hover:bg-green-200 text-green-800 font-semibold py-1 px-3 rounded-full text-xs">最初の記録を追加する</a>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+
+    {# (任意) ページネーションを追加する場合 #}
+
+</div>
+{% endblock %}
