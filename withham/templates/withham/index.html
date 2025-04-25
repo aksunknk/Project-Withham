@@ -1,72 +1,3 @@
-<<<<<<< HEAD
-{# withham/templates/withham/index.html #}
-
-{% extends "withham/base.html" %} {# 新しいbase.htmlを継承 #}
-{% load static %} {# staticタグを使う場合 #}
-
-{% block title %}タイムライン - withham{% endblock %} {# ページのタイトルを設定 #}
-
-{% block content %} {# base.htmlのcontentブロックをこの内容で上書き #}
-    <h2 class="mb-4">{{ message|default:"タイムライン" }}</h2> {# ビューから渡されたmessage、なければデフォルト表示 #}
-    {# <hr> #} {# Bootstrapのカードで区切られるのでhrは不要かも #}
-
-    {# ↓↓↓ ここから投稿一覧表示 (Bootstrap Card形式) ↓↓↓ #}
-    {% for post in posts %} {# ビューから渡された 'posts' リストをループ #}
-        <div class="card mb-3 shadow-sm"> {# カード全体を囲む (マージンと影付き) #}
-            <div class="card-body"> {# カードのコンテンツ部分 #}
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    {# カードのヘッダー部分 (左: ユーザー名+ハムスター / 右: 日時) #}
-                    <div class="lh-sm"> {# 行の高さを調整 #}
-                        <h5 class="card-title mb-0">
-                            {# 投稿者のプロフィールへのリンク #}
-                            <a href="{% url 'withham:profile_detail' post.author.pk %}" class="text-decoration-none fw-bold">@{{ post.author.username }}</a>
-                        </h5>
-                        {# ハムスターが関連付けられていればバッジで表示 #}
-                        {% if post.hamster %}
-                             <span class="badge bg-info fw-normal">🐹 {{ post.hamster.name }}</span>
-                        {% endif %}
-                    </div>
-                    {# 投稿日時を小さく表示 #}
-                    <small class="text-muted flex-shrink-0 ms-2">{{ post.created_at|date:"y/m/d H:i" }}</small> {# 短縮表示例 #}
-                </div>
-
-                {# 投稿本文 (改行を<br>に変換) #}
-                <p class="card-text mt-2 mb-2">{{ post.text|linebreaksbr }}</p>
-
-                {# 投稿画像があれば表示 (レスポンシブ対応) #}
-                {% if post.image %}
-                    {# 画像クリックで詳細ページへ飛ぶようにリンクを追加（任意） #}
-                    {# <a href="#"> #}
-                        <img src="{{ post.image.url }}" class="img-fluid rounded mb-2" alt="投稿画像 {{ post.id }}">
-                    {# </a> #}
-                {% endif %}
-
-                {# アクションボタンなどのエリア #}
-                <div class="d-flex justify-content-start">
-                    <button type="button" class="btn btn-outline-secondary btn-sm me-2">
-                        <i class="bi bi-chat"></i> コメント {# Bootstrap Iconsを使う場合の例 #}
-                    </button>
-                    <button type="button" class="btn btn-outline-danger btn-sm me-2">
-                        <i class="bi bi-heart"></i> いいね {# Bootstrap Iconsを使う場合の例 #}
-                    </button>
-                    {# 他のアクション（例：リポスト、共有など） #}
-                    {# <button type="button" class="btn btn-outline-secondary btn-sm"><i class="bi bi-repeat"></i></button> #}
-                </div>
-            </div> {# card-body 終了 #}
-        </div> {# card 終了 #}
-    {% empty %}
-        {# 投稿が1件もない場合に表示 (Bootstrap Alertを使用) #}
-        <div class="alert alert-secondary mt-4" role="alert">
-            まだ投稿がありません。最初の投稿をしてみませんか？
-            {% if user.is_authenticated %}
-                 <a href="{% url 'withham:post_create' %}" class="btn btn-primary btn-sm ms-2">新規投稿</a>
-            {% endif %}
-        </div>
-    {% endfor %}
-    {# ↑↑↑ ここまで投稿一覧表示 ↑↑↑ #}
-
-{% endblock %} {# contentブロックの終了 #}
-=======
 {# withham/templates/withham/index.html (いいね機能・モーダル対応) #}
 
 {% extends "withham/base.html" %} {# Tailwind適用済みのbase.htmlを継承 #}
@@ -186,4 +117,3 @@
     {# --- 投稿一覧ループ終了 --- #}
 
 {% endblock %}
->>>>>>> b6e6bb3 (no message)

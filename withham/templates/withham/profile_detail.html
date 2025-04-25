@@ -1,81 +1,15 @@
-<<<<<<< HEAD
-{# withham/templates/withham/profile_detail.html #}
-
-{% extends "withham/base.html" %} {# ベーステンプレートを継承 #}
-{% load static %} {# デフォルト画像表示のために static をロード #}
-=======
-{# withham/templates/withham/profile_detail.html (健康記録リンク追加) #}
+{# withham/templates/withham/profile_detail.html (ハムスター一覧追加版) #}
 
 {% extends "withham/base.html" %} {# Tailwind適用済みのbase.htmlを継承 #}
-{% load static %} {# デフォルトアバター画像表示のために static をロード #}
+{% load static %} {# デフォルトアバター/ハムスター画像表示のために static をロード #}
 {% load humanize %} {# timesinceフィルタのために humanize をロード #}
->>>>>>> b6e6bb3 (no message)
 
 {% block title %}{{ profile_user.username }}のプロフィール - withham{% endblock %} {# ページのタイトル #}
 
 {% block content %} {# contentブロックを上書き #}
 
     {# --- プロフィールヘッダー情報 --- #}
-<<<<<<< HEAD
-    <div class="profile-header mb-4 p-4 bg-light rounded border"> {# パディング、背景色、角丸、枠線を追加 #}
-        <div class="d-flex align-items-center">
-            {# (将来的に) プロフィール画像 #}
-            {# <img src="..." class="rounded-circle me-3" width="80" height="80" alt="プロフィール画像"> #}
-            <div class="flex-grow-1">
-                <h2 class="mb-1">{{ profile_user.username }}</h2>
-                {# (将来的に) 自己紹介文など #}
-                {# <p class="text-muted mb-2">ここに自己紹介文が入ります。</p> #}
-
-                {# ★ 自分のプロフィールか他人かでボタンを出し分ける #}
-                {% if request.user == profile_user %}
-                    {# 自分のプロフィールの場合 #}
-                    <a href="#" class="btn btn-outline-secondary btn-sm mt-2">プロフィールを編集</a>
-                    {# ↑ 編集機能のURLは別途作成 #}
-                {% else %}
-                    {# 他人のプロフィールの場合（フォロー機能実装後） #}
-                    {# <button class="btn btn-primary btn-sm mt-2">フォローする</button> #}
-                    {# <button class="btn btn-secondary btn-sm mt-2">アンフォロー</button> #}
-                {% endif %}
-            </div>
-        </div>
-        {# (将来的に) フォロー・フォロワー数など #}
-        {# <div class="mt-3">
-            <span class="me-3"><strong>100</strong> フォロー中</span>
-            <span><strong>250</strong> フォロワー</span>
-        </div> #}
-    </div>
-
-    {# --- ハムスター一覧表示エリア --- #}
-    <div class="hamster-section mb-4">
-        <h3><i class="bi bi-heart-fill text-danger"></i> このユーザーのハムスター</h3> {# アイコン例 (Bootstrap Iconsが必要) #}
-        {# BootstrapのGridを使ってカードを並べる #}
-        <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 g-3 mt-2"> {# 画面幅に応じて列数を変更 #}
-            {% for hamster in hamsters %} {# ★ ビューから渡された 'hamsters' をループ #}
-                <div class="col">
-                    <div class="card text-center h-100 shadow-sm"> {# カードに影を追加 #}
-                        {% if hamster.profile_image %}
-                            {# ハムスターの画像があれば表示 #}
-                            <img src="{{ hamster.profile_image.url }}" class="card-img-top" alt="{{ hamster.name }}" style="aspect-ratio: 1 / 1; object-fit: cover;">
-                        {% else %}
-                            {# なければデフォルト画像を表示 (staticディレクトリに画像が必要) #}
-                            <img src="{% static 'images/default_hamster_icon.svg' %}" class="card-img-top p-3" alt="デフォルト画像" style="aspect-ratio: 1 / 1; object-fit: contain; background-color: #eee;">
-                            {# ↑ default_hamster_icon.svg は用意した画像ファイル名・パスに変更してください #}
-                        {% endif %}
-                        <div class="card-body p-2">
-                            {# ハムスターの名前 (詳細ページへのリンクは今は#) #}
-                            <h6 class="card-title mb-0"><a href="#" class="text-decoration-none stretched-link">{{ hamster.name }}</a></h6>
-                        </div>
-                    </div>
-                </div>
-            {% empty %}
-                {# ハムスターが1匹も登録されていない場合に表示 #}
-                <div class="col-12">
-                    <p class="text-muted">まだハムスターが登録されていません。</p>
-                    {# 自分のプロフィールの場合のみ登録を促すリンクを表示 #}
-                    {% if request.user == profile_user %}
-                         <a href="{% url 'withham:hamster_create' %}" class="btn btn-sm btn-outline-success">ハムスターを登録する</a>
-=======
-    <div class="profile-header mb-6 p-4 sm:p-6 bg-white rounded-xl shadow-sm border border-gray-200">
+    <div class="profile-header mb-6 p-4 sm:p-6 bg-white rounded-xl shadow-sm border border-gray-200"> {# スタイル調整 #}
         <div class="flex flex-col sm:flex-row items-center">
             {# アバター画像 #}
             <div class="flex-shrink-0 mb-4 sm:mb-0 sm:mr-6">
@@ -83,6 +17,7 @@
                     <img src="{{ profile_user.profile.avatar.url }}" class="h-24 w-24 rounded-full object-cover border-2 border-white shadow-md" alt="{{ profile_user.username }}のプロフィール画像">
                 {% else %}
                     <img src="{% static 'images/default_avatar.png' %}" class="h-24 w-24 rounded-full object-cover border-2 border-white shadow-md bg-gray-200" alt="デフォルトアバター">
+                    {# ↑ default_avatar.png は用意した画像ファイル名・パスに変更してください (staticディレクトリに画像が必要) #}
                 {% endif %}
             </div>
 
@@ -100,29 +35,38 @@
                 {# 編集ボタン / フォローボタン #}
                 {% if request.user == profile_user %}
                     <a href="{% url 'withham:profile_edit' %}" class="inline-block bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-4 rounded-full text-sm">プロフィールを編集</a>
+                {% else %}
+                    {# 他人のプロフィールの場合（フォロー機能実装後） #}
+                    {# <button class="inline-block bg-[#f2800d] hover:opacity-90 text-[#1c140d] font-bold py-1 px-4 rounded-full text-sm">フォローする</button> #}
                 {% endif %}
             </div>
         </div>
+         {# (将来的に) フォロー・フォロワー数など #}
+         {# <div class="mt-4 pt-4 border-t border-gray-200 flex gap-4 justify-center sm:justify-start">
+            <span class="text-sm text-gray-600"><strong class="font-medium text-[#1c140d]">100</strong> フォロー中</span>
+            <span class="text-sm text-gray-600"><strong class="font-medium text-[#1c140d]">250</strong> フォロワー</span>
+        </div> #}
     </div>
 
     {# --- ハムスター一覧表示エリア --- #}
-    {# ↓↓↓ コメントアウトを解除 ↓↓↓ #}
+    {# ↓↓↓ コメントアウトを解除しました ↓↓↓ #}
     <div class="hamster-section mb-6">
         <h3 class="text-xl font-bold text-[#1c140d] mb-4">🐹 このユーザーのハムスター</h3>
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"> {# Tailwind Gridで配置 #}
-            {% for hamster in hamsters %} {# ビューから 'hamsters' を渡す #}
+            {% for hamster in hamsters %} {# ★ ビューから 'hamsters' を渡す必要あり #}
                 <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200 text-center">
                     <a href="#" class="block group relative"> {# ハムスター詳細へのリンク (仮) #}
                         {% if hamster.profile_image %}
                             <img src="{{ hamster.profile_image.url }}" class="w-full aspect-square object-cover group-hover:opacity-90 transition-opacity" alt="{{ hamster.name }}">
                         {% else %}
                             <img src="{% static 'images/default_hamster_icon.svg' %}" class="w-full aspect-square object-contain p-4 bg-gray-100 group-hover:opacity-90 transition-opacity" alt="デフォルト画像">
+                            {# ↑ default_hamster_icon.svg は適切な画像ファイル名・パスに変更してください #}
                         {% endif %}
                         <div class="p-2">
                             <h4 class="text-sm font-medium text-[#1c140d] truncate">{{ hamster.name }}</h4>
                         </div>
                     </a>
-                     {# ★★★ 自分のプロフィールの場合のみ記録リンクを表示 ★★★ #}
+                    {# ★★★ 自分のプロフィールの場合のみ記録リンクを表示 ★★★ #}
                     {% if request.user == profile_user %}
                     <div class="p-2 border-t border-gray-100">
                         <a href="{% url 'withham:health_log_create' hamster.pk %}" class="text-xs text-green-600 hover:text-green-800 font-medium">
@@ -141,51 +85,10 @@
                     <p>まだハムスターが登録されていません。</p>
                     {% if request.user == profile_user %}
                          <a href="{% url 'withham:hamster_create' %}" class="mt-2 inline-block bg-green-100 hover:bg-green-200 text-green-800 font-semibold py-1 px-3 rounded-full text-xs">ハムスターを登録する</a>
->>>>>>> b6e6bb3 (no message)
                     {% endif %}
                 </div>
             {% endfor %}
         </div>
-<<<<<<< HEAD
-        <hr class="mt-4"> {# 区切り線 #}
-    </div>
-
-    {# --- 投稿一覧表示エリア --- #}
-    <h3 class="mb-3"><i class="bi bi-pencil-square"></i> 投稿一覧</h3> {# アイコン例 #}
-
-    {# ★ 投稿一覧表示部分は index.html と同様のカード形式 #}
-    {% for post in posts %} {# ビューから渡された 'posts' リストをループ #}
-        <div class="card mb-3 shadow-sm">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <div class="lh-sm">
-                        <h5 class="card-title mb-0">
-                            {# プロフィールページなので投稿者名は省略しても良いかも #}
-                            {% if post.hamster %}
-                                 <span class="badge bg-info fw-normal">🐹 {{ post.hamster.name }}</span>
-                            {% endif %}
-                        </h5>
-                    </div>
-                    <small class="text-muted flex-shrink-0 ms-2">{{ post.created_at|date:"y/m/d H:i" }}</small>
-                </div>
-                <p class="card-text mt-2 mb-2">{{ post.text|linebreaksbr }}</p>
-                {% if post.image %}
-                    <img src="{{ post.image.url }}" class="img-fluid rounded mb-2" alt="投稿画像 {{ post.id }}">
-                {% endif %}
-                <div class="d-flex justify-content-start">
-                    <button type="button" class="btn btn-outline-secondary btn-sm me-2"><i class="bi bi-chat"></i> コメント</button>
-                    <button type="button" class="btn btn-outline-danger btn-sm me-2"><i class="bi bi-heart"></i> いいね</button>
-                </div>
-            </div>
-        </div>
-    {% empty %}
-        <div class="alert alert-secondary mt-4" role="alert">
-            まだ投稿がありません。
-        </div>
-    {% endfor %}
-
-{% endblock %} {# contentブロックの終了 #}
-=======
         <hr class="my-6 border-gray-200"> {# 区切り線 #}
     </div>
     {# --- ↑↑↑ ハムスター一覧表示エリアここまで ↑↑↑ --- #}
@@ -193,8 +96,8 @@
 
     {# --- 投稿一覧表示エリア --- #}
     <h3 class="text-xl font-bold text-[#1c140d] mb-4">投稿一覧</h3>
-    {# ... (投稿一覧のループ部分は変更なし) ... #}
-    {% for post in posts %}
+
+    {% for post in posts %} {# ビューから渡された 'posts' リストをループ #}
         <div class="bg-white rounded-xl shadow-sm mb-4 border border-gray-200">
             <div class="p-4">
                 <div class="flex justify-between items-center mb-3">
@@ -203,7 +106,7 @@
                             {% if post.hamster %}
                                  <span class="inline-block bg-[#e0f2fe] text-[#0ea5e9] text-xs font-medium px-2 py-0.5 rounded-full">🐹 {{ post.hamster.name }}</span>
                             {% endif %}
-                            <p class="text-[#9c7349] text-sm font-normal leading-normal {% if post.hamster %}mt-1{% endif %}">{{ post.created_at|timesince }}前</p>
+                            <p class="text-[#9c7349] text-sm font-normal leading-normal {% if post.hamster %}mt-1{% endif %}">{{ post.created_at|timesince }}前</p> {# ハムスター名がない場合はマージン調整 #}
                         </div>
                     </div>
                      <button class="ml-auto text-gray-500 hover:text-gray-700">
@@ -268,4 +171,3 @@
     {% endfor %}
 
 {% endblock %} {# contentブロックの終了 #}
->>>>>>> b6e6bb3 (no message)

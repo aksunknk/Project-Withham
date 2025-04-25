@@ -1,27 +1,11 @@
-<<<<<<< HEAD
-{# withham/templates/withham/hamster_form.html を新規作成 #}
-
-{% extends "withham/base.html" %} {# ベーステンプレートを継承 #}
-=======
 {# withham/templates/withham/hamster_form.html (Tailwind CSS適用版) #}
 
 {% extends "withham/base.html" %} {# Tailwind適用済みのbase.htmlを継承 #}
 {% load static %}
->>>>>>> b6e6bb3 (no message)
 
 {% block title %}ハムスター情報{% if form.instance.pk %}編集{% else %}登録{% endif %} - withham{% endblock %}
 
 {% block content %}
-<<<<<<< HEAD
-    <h2>ハムスター情報{% if form.instance.pk %}編集{% else %}登録{% endif %}</h2>
-    {# 画像を扱うので enctype が必要 #}
-    <form method="post" enctype="multipart/form-data">
-        {% csrf_token %}
-        {{ form.as_p }} {# フォームを段落形式で表示 #}
-        <button type="submit">{% if form.instance.pk %}更新する{% else %}登録する{% endif %}</button>
-    </form>
-{% endblock %}
-=======
 <div class="max-w-xl mx-auto mt-8 px-4"> {# フォーム全体のコンテナ #}
     <div class="bg-white p-6 md:p-8 rounded-xl shadow-md border border-gray-200"> {# カード風スタイル #}
         <h2 class="text-2xl font-bold text-center text-[#1c140d] mb-6">ハムスター情報{% if form.instance.pk %}編集{% else %}登録{% endif %}</h2>
@@ -167,4 +151,3 @@
 * 対応するビュー (`views.hamster_create` や、今後作成する `views.hamster_edit`) が、`HamsterForm` のインスタンスを `'form'` というキー名でコンテキストとして渡している必要があります。編集の場合は `instance` 引数も渡します。
 
 このコードを `withham/templates/withham/hamster_form.html` として保存・配置し、ブラウザでハムスター登録ページ (`/hamsters/new/`) や編集ページ（今後作成）を表示して確認してみてくだ
->>>>>>> b6e6bb3 (no message)

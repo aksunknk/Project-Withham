@@ -1,0 +1,9 @@
+diff a/withham/forms.py b/withham/forms.py	(rejected hunks)
+@@ -1,6 +1,7 @@
+ # withham/forms.py を新規作成
+ 
+ from django import forms
++<<<<<<< HEAD
+ from .models import Post, Hamster
+ =======
+ from .models import Post, Hamster, UserProfile, Comment, HealthLog

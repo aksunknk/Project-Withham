@@ -3,13 +3,9 @@
 from django.db import models
 from django.contrib.auth.models import User # Django標準のユーザーモデル
 from django.utils import timezone # タイムゾーン対応の日時
-<<<<<<< HEAD
-=======
-# ★ シグナルを使うためにインポート (ステップ2で説明)
+# ★ シグナルを使うためにインポート
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-
->>>>>>> b6e6bb3 (no message)
 
 class Hamster(models.Model):
     """ハムスターのモデル"""
@@ -42,14 +38,10 @@ class Post(models.Model):
     text = models.TextField('本文')
     image = models.ImageField('画像', upload_to='post_images/', blank=True, null=True)
     created_at = models.DateTimeField('投稿日時', default=timezone.now)
-<<<<<<< HEAD
-=======
     # ↓↓↓ この ManyToManyField を追加 ↓↓↓
     # blank=True で「いいね」が0件でもOKなようにする
     # related_name='liked_posts' で user.liked_posts.all() のように逆参照できる
     likes = models.ManyToManyField(User, related_name='liked_posts', blank=True, verbose_name='いいねしたユーザー')
-
->>>>>>> b6e6bb3 (no message)
 
     def __str__(self):
         return f'Post by {self.author.username} at {self.created_at.strftime("%Y-%m-%d %H:%M")}'
@@ -59,9 +51,6 @@ class Post(models.Model):
         verbose_name_plural = '投稿'
         ordering = ['-created_at'] # 新しい投稿が上にくるように
 
-<<<<<<< HEAD
-# --- 今後、Comment, Like, Follow モデルなどもここに追加していきます ---
-=======
 
 # ★ UserProfile モデルを追加
 class UserProfile(models.Model):
@@ -111,7 +100,6 @@ def save_user_profile(sender, instance, **kwargs):
         # まだUserProfileが存在しない場合は作成する (create_user_profileがあるなら通常不要)
         UserProfile.objects.create(user=instance)
 
-# --- 今後、Comment, Like, Follow モデルなどもここに追加していきます ---
 # ★★★ HealthLog モデルを追加 ★★★
 class HealthLog(models.Model):
     """ハムスターの健康記録モデル"""
@@ -138,5 +126,3 @@ class HealthLog(models.Model):
 
     def __str__(self):
         return f"{self.hamster.name} - {self.log_date.strftime('%Y-%m-%d')}"
-
->>>>>>> b6e6bb3 (no message)

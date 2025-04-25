@@ -1,11 +1,7 @@
 # withham/forms.py を新規作成
 
 from django import forms
-<<<<<<< HEAD
-from .models import Post, Hamster
-=======
 from .models import Post, Hamster, UserProfile, Comment, HealthLog
->>>>>>> b6e6bb3 (no message)
 
 class PostForm(forms.ModelForm):
     # ハムスター選択フィールドをカスタマイズ（任意）
@@ -30,6 +26,7 @@ class PostForm(forms.ModelForm):
         widgets = { # 見た目を調整したい場合（任意）
             'text': forms.Textarea(attrs={'rows': 4}),
         }
+
 class HamsterForm(forms.ModelForm):
     # 誕生日の入力ウィジェットをカレンダー選択にする（任意）
     birthday = forms.DateField(
@@ -51,9 +48,6 @@ class HamsterForm(forms.ModelForm):
         }
         widgets = { # 見た目の調整（任意）
             'profile_text': forms.Textarea(attrs={'rows': 4}),
-<<<<<<< HEAD
-        }
-=======
         }
 
 class UserProfileForm(forms.ModelForm):
@@ -134,4 +128,3 @@ class HealthLogForm(forms.ModelForm):
     #     # このフォームではhamsterフィールドは直接使わないが、
     #     # もしビューでハムスターを選択させる場合はここでquerysetを絞り込む
     #     # self.fields['hamster'].queryset = Hamster.objects.filter(owner=user)
->>>>>>> b6e6bb3 (no message)
