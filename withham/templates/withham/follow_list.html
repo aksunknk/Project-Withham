@@ -68,17 +68,3 @@
     </div>
 </div>
 {% endblock %}
-<!-- ```
-
-**修正点:**
-
-* フォロー状態を確認する条件を `{% if target_user in request.user.profile.following.all %}` に変更しました。これは、ログインユーザー (`request.user`) のプロフィール (`profile`) がフォローしているユーザーリスト (`following.all`) の中に、現在ループで表示しているユーザー (`target_user`) が含まれているかを確認する、より直接的で確実な方法です。
-* コード全体の `{% if %}` と `{% endif %}` の対応関係を再確認しました。上記のコードでは、`{% empty %}` の前に2つの `{% endif %}` が正しく配置されています。
-
-**確認:**
-
-1.  右側のドキュメントが更新されたことを確認してください。
-2.  このコードを `withham/templates/withham/follow_list.html` として保存してください。
-3.  開発サーバーを再起動し、ブラウザでフォロー中/フォロワー一覧ページ (`/users/<pk>/following/` または `/users/<pk>/followers/`) を表示してみてください。
-
-これで `TemplateSyntaxError` が解消され、ページが正しく表示されるはず -->
