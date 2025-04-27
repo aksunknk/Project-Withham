@@ -2,6 +2,8 @@
 
 from django import forms
 from .models import Post, Hamster, UserProfile, Comment, HealthLog
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.models import User # Userモデルもインポート
 
 class PostForm(forms.ModelForm):
     # ハムスター選択フィールドをカスタマイズ（任意）
@@ -128,3 +130,16 @@ class HealthLogForm(forms.ModelForm):
     #     # このフォームではhamsterフィールドは直接使わないが、
     #     # もしビューでハムスターを選択させる場合はここでquerysetを絞り込む
     #     # self.fields['hamster'].queryset = Hamster.objects.filter(owner=user)
+# ★★★ SignUpForm を追加 ★★★
+class SignUpForm(UserCreationForm):
+    """ユーザー登録用フォーム"""
+    # 必要であればフィールドを追加・カスタマイズできます
+    # 例: メールアドレスを必須にする
+    # email = forms.EmailField(label="メールアドレス", required=True)
+
+    class Meta(UserCreationForm.Meta):
+        # 標準のUserモデルを使用
+        model = User
+        # フォームに表示するフィールド (パスワード確認欄はUserCreationFormが自動で追加)
+        fields = ('username', 'email') # emailフィールドを追加する場合
+        # fields = ('username',) # ユーザー名のみの場合

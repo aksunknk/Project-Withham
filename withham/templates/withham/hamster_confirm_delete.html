@@ -1,0 +1,30 @@
+{# withham/templates/withham/hamster_confirm_delete.html #}
+
+{% extends "withham/base.html" %}
+
+{% block title %}ハムスター情報削除の確認 - withham{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto mt-8 px-4">
+    <div class="bg-white p-6 rounded-xl shadow-md border border-red-300"> {# 枠を赤くするなど警告風に #}
+        <h2 class="text-xl font-bold text-center text-red-700 mb-4">削除の確認</h2>
+        <p class="text-center text-gray-700 mb-6">
+            本当にハムスター「<strong>{{ object.name }}</strong>」の情報を削除しますか？<br>
+            この操作は元に戻せません。
+        </p>
+        <form method="post">
+            {% csrf_token %}
+            <div class="flex justify-center gap-4">
+                {# キャンセルボタン (プロフィールページに戻るなど) #}
+                <a href="{% url 'withham:profile_detail' user.pk %}" class="inline-block bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-6 rounded-lg">
+                    キャンセル
+                </a>
+                {# 削除実行ボタン #}
+                <button type="submit" class="inline-block bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-6 rounded-lg">
+                    削除する
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

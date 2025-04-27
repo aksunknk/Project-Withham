@@ -7,22 +7,33 @@ from django.utils import timezone # タイムゾーン対応の日時
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-# --- UserProfile モデル ---
-# Django標準のUserモデルに追加情報を紐付けるためのモデル
+# =============================================
+# ユーザープロフィール関連
+# =============================================
+
 class UserProfile(models.Model):
+    """ユーザープロフィールモデル"""
     # 標準のUserモデルと1対1で紐付ける (Userが削除されたらProfileも削除)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     # 自己紹介文 (空でもOK)
     bio = models.TextField("自己紹介", blank=True, null=True)
     # プロフィール画像 (任意アップロード)
     avatar = models.ImageField("プロフィール画像", upload_to='avatars/', null=True, blank=True)
+    # 'self' を使うと UserProfile同士でフォロー関係を持つことになるが、
+    # Userモデルを直接参照する方がシンプルかもしれない。ここではUserを参照する。
+    # symmetrical=False で、AがBをフォローしてもBがAをフォローするとは限らない非対称な関係を示す。
+    # related_name='followers' で user.profile.followers.all() のようにフォロワーを取得できる。
+    following = models.ManyToManyField(User, related_name='followers', symmetrical=False, blank=True)
 
     def __str__(self):
         # 管理画面などでユーザー名を表示
         return self.user.username
 
-# --- シグナルレシーバー関数 (UserProfile自動作成用) ---
-# Userモデルのデータが保存された後(post_save)に実行される関数
+    class Meta:
+        verbose_name = 'ユーザープロフィール'
+        verbose_name_plural = 'ユーザープロフィール'
+
+# シグナルレシーバー関数 (UserProfile自動作成用)
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     # 新規ユーザーが作成された(created=True)場合のみ実行
@@ -31,16 +42,25 @@ def create_user_profile(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender=User)
 def save_user_profile(sender, instance, **kwargs):
-    # Userモデルが保存されたときに、関連するUserProfileも保存する
-    # (OneToOneFieldでは必須ではない場合もあるが、念のため)
     try:
-        instance.profile.save()
+        # OneToOneFieldの場合、User保存時に自動で関連profileも保存されることが多いが、
+        # 明示的に呼ぶことで確実性を高める（特にprofileに他のロジックがある場合）
+        # ただし、無限ループにならないよう注意が必要。ここでは単純なsaveのみ。
+        # 存在しない場合のエラーハンドリングも含む。
+        if hasattr(instance, 'profile'):
+             instance.profile.save()
+        else:
+             # シグナルが呼ばれる前にprofileがない場合（通常はありえないが念のため）
+             UserProfile.objects.create(user=instance)
     except UserProfile.DoesNotExist:
-        # UserProfileが存在しない稀なケースに対応 (通常は上の関数で作成される)
-        UserProfile.objects.create(user=instance)
+         UserProfile.objects.create(user=instance)
 
 
-# --- Hamster モデル ---
+
+# =============================================
+# ハムスター関連
+# =============================================
+
 class Hamster(models.Model):
     """ハムスターのモデル"""
     # 飼い主 (Userモデルと多対1の関係)
@@ -76,7 +96,10 @@ class Hamster(models.Model):
         verbose_name_plural = 'ハムスター'
 
 
-# --- Post モデル ---
+# =============================================
+# 投稿・コメント関連
+# =============================================
+
 class Post(models.Model):
     """投稿のモデル"""
     # 投稿者 (Userモデルと多対1の関係)
@@ -104,7 +127,6 @@ class Post(models.Model):
         ordering = ['-created_at']
 
 
-# --- Comment モデル ---
 class Comment(models.Model):
     """投稿へのコメントモデル"""
     # 対象となる投稿 (Postモデルと多対1の関係)
@@ -116,6 +138,11 @@ class Comment(models.Model):
     # コメント投稿日時 (自動記録)
     created_at = models.DateTimeField("投稿日時", default=timezone.now)
 
+    def __str__(self):
+        # 管理画面などで「ユーザー名: "コメント冒頭..." on 投稿ID」を表示
+        text_summary = self.text[:20] + '...' if len(self.text) > 20 else self.text
+        return f'{self.author.username}: "{text_summary}" on Post {self.post.id}'
+
     class Meta:
         # 管理画面での表示名
         verbose_name = 'コメント'
@@ -123,13 +150,11 @@ class Comment(models.Model):
         # デフォルトの並び順 (古いコメントが上に)
         ordering = ['created_at']
 
-    def __str__(self):
-        # 管理画面などで「ユーザー名: "コメント冒頭..." on 投稿ID」を表示
-        text_summary = self.text[:20] + '...' if len(self.text) > 20 else self.text
-        return f'{self.author.username}: "{text_summary}" on Post {self.post.id}'
 
+# =============================================
+# 健康記録関連
+# =============================================
 
-# --- HealthLog モデル ---
 class HealthLog(models.Model):
     """ハムスターの健康記録モデル"""
     # 対象ハムスター (Hamsterモデルと多対1の関係)
@@ -145,6 +170,10 @@ class HealthLog(models.Model):
     # データ作成日時 (自動記録)
     created_at = models.DateTimeField("作成日時", auto_now_add=True)
 
+    def __str__(self):
+        # 管理画面などで「ハムスター名 - 日付」を表示
+        return f"{self.hamster.name} - {self.log_date.strftime('%Y-%m-%d')}"
+
     class Meta:
         # 管理画面での表示名
         verbose_name = '健康記録'
@@ -153,8 +182,4 @@ class HealthLog(models.Model):
         ordering = ['-log_date', '-created_at']
         # (任意) 同じハムスターの同じ日付の記録は1つだけにする制約
         # unique_together = ('hamster', 'log_date')
-
-    def __str__(self):
-        # 管理画面などで「ハムスター名 - 日付」を表示
-        return f"{self.hamster.name} - {self.log_date.strftime('%Y-%m-%d')}"
 

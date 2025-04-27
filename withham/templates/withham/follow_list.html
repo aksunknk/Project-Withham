@@ -1,0 +1,84 @@
+{# withham/templates/withham/follow_list.html (endif修正確認版) #}
+
+{% extends "withham/base.html" %} {# Tailwind適用済みのbase.htmlを継承 #}
+{% load static %}
+
+{% block title %}{{ profile_user.username }}さんの{{ list_type }}一覧 - withham{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto mt-8 px-4"> {# コンテンツ幅を調整 #}
+    <div class="bg-white p-6 md:p-8 rounded-xl shadow-md border border-gray-200">
+
+        {# --- ページヘッダー --- #}
+        <div class="flex items-center gap-3 mb-6 pb-4 border-b border-gray-200">
+            <a href="{% url 'withham:profile_detail' profile_user.pk %}">
+                {% if profile_user.profile.avatar %}
+                    <img src="{{ profile_user.profile.avatar.url }}" class="h-12 w-12 rounded-full object-cover" alt="{{ profile_user.username }}">
+                {% else %}
+                    <img src="{% static 'images/default_avatar.png' %}" class="h-12 w-12 rounded-full bg-gray-200 object-cover" alt="デフォルトアバター">
+                {% endif %}
+            </a>
+            <div>
+                <a href="{% url 'withham:profile_detail' profile_user.pk %}" class="text-lg font-semibold text-[#1c140d] hover:underline">@{{ profile_user.username }}</a>
+                {# list_type 変数を使ってタイトルを表示 #}
+                <h2 class="text-xl font-bold text-[#1c140d]">{{ list_type }}</h2>
+            </div>
+        </div>
+
+        {# --- ユーザーリスト --- #}
+        <div class="space-y-4">
+            {% for target_user in user_list %}
+                <div class="flex items-center justify-between gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    {# ユーザー情報 (アバターと名前) #}
+                    <a href="{% url 'withham:profile_detail' target_user.pk %}" class="flex items-center gap-3 flex-grow min-w-0"> {# flex-grow と min-w-0 で名前の省略に対応 #}
+                        {% if target_user.profile.avatar %}
+                            <img src="{{ target_user.profile.avatar.url }}" class="h-10 w-10 rounded-full object-cover flex-shrink-0" alt="{{ target_user.username }}">
+                        {% else %}
+                            <img src="{% static 'images/default_avatar.png' %}" class="h-10 w-10 rounded-full bg-gray-200 object-cover flex-shrink-0" alt="デフォルトアバター">
+                        {% endif %}
+                        <span class="text-sm font-medium text-[#1c140d] truncate">{{ target_user.username }}</span> {# truncateで長い名前を省略 #}
+                    </a>
+
+                    {# フォロー/アンフォローボタン (ログインしていて、自分自身でない場合に表示) #}
+                    {% if request.user.is_authenticated and request.user != target_user %}
+                        <form action="{% url 'withham:toggle_follow' target_user.pk %}" method="post" class="inline ml-auto flex-shrink-0"> {# ml-auto で右寄せ, flex-shrink-0 で縮まないように #}
+                            {% csrf_token %}
+                            {# ★★★ ログインユーザーがこのリストのユーザーをフォローしているか確認 (修正) ★★★ #}
+                            {% if target_user in request.user.profile.following.all %}
+                                {# フォロー中の場合: アンフォローボタン #}
+                                <button type="submit" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-1 px-3 rounded-full text-xs">
+                                    フォロー解除
+                                </button>
+                            {% else %}
+                                {# フォローしていない場合: フォローボタン #}
+                                <button type="submit" class="bg-[#f2800d] hover:opacity-90 text-[#1c140d] font-bold py-1 px-3 rounded-full text-xs">
+                                    フォローする
+                                </button>
+                            {% endif %} {# ★ 内側の if の endif #}
+                        </form>
+                    {% endif %} {# ★ 外側の if の endif #}
+                </div>
+            {% empty %} {# ★ この empty タグの前に endif が揃っているか確認 #}
+                <p class="text-center text-gray-500 py-4">ユーザーが見つかりません。</p>
+            {% endfor %}
+        </div>
+
+        {# (任意) ページネーションを追加する場合 #}
+
+    </div>
+</div>
+{% endblock %}
+<!-- ```
+
+**修正点:**
+
+* フォロー状態を確認する条件を `{% if target_user in request.user.profile.following.all %}` に変更しました。これは、ログインユーザー (`request.user`) のプロフィール (`profile`) がフォローしているユーザーリスト (`following.all`) の中に、現在ループで表示しているユーザー (`target_user`) が含まれているかを確認する、より直接的で確実な方法です。
+* コード全体の `{% if %}` と `{% endif %}` の対応関係を再確認しました。上記のコードでは、`{% empty %}` の前に2つの `{% endif %}` が正しく配置されています。
+
+**確認:**
+
+1.  右側のドキュメントが更新されたことを確認してください。
+2.  このコードを `withham/templates/withham/follow_list.html` として保存してください。
+3.  開発サーバーを再起動し、ブラウザでフォロー中/フォロワー一覧ページ (`/users/<pk>/following/` または `/users/<pk>/followers/`) を表示してみてください。
+
+これで `TemplateSyntaxError` が解消され、ページが正しく表示されるはず -->
