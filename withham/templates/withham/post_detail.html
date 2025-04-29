@@ -1,8 +1,9 @@
-{# withham/templates/withham/post_detail.html (コメント・いいね機能実装) #}
+{# withham/templates/withham/post_detail.html (アクションボタン修正) #}
 
 {% extends "withham/base.html" %} {# Tailwind適用済みのbase.htmlを継承 #}
 {% load static %} {# アバター画像などでstaticタグを使うため #}
-{% load humanize %} {# 日時表示に timesince を使う場合 (settings.pyへの追加も必要) #}
+{% load humanize %} {# 日時表示に timesince を使う場合 #}
+{% load withham_tags %} {# ハッシュタグリンク用カスタムタグ #}
 
 {% block title %}{{ post.author.username }}さんの投稿 - withham{% endblock %}
 
@@ -23,117 +24,104 @@
                 <a href="{% url 'withham:profile_detail' post.author.pk %}" class="text-[#1c140d] text-sm font-semibold hover:underline">@{{ post.author.username }}</a>
                 <p class="text-[#9c7349] text-xs">{{ post.created_at|timesince }}前</p>
             </div>
-            <button class="ml-auto text-gray-500 hover:text-gray-700">
-                 <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256"><path d="M144,128a16,16,0,1,1-16-16A16,16,0,0,1,144,128ZM128,64a16,16,0,1,0-16-16A16,16,0,0,0,128,64Zm0,128a16,16,0,1,0,16,16A16,16,0,0,0,128,192Z"></path></svg>
-            </button>
+            {% if request.user == post.author %}
+            <div x-data="{ open: false }" class="ml-auto relative">
+                <button @click="open = !open" class="text-gray-500 hover:text-gray-700 focus:outline-none">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256"><path d="M144,128a16,16,0,1,1-16-16A16,16,0,0,1,144,128ZM128,64a16,16,0,1,0-16-16A16,16,0,0,0,128,64Zm0,128a16,16,0,1,0,16,16A16,16,0,0,0,128,192Z"></path></svg>
+                </button>
+                <div x-show="open" @click.away="open = false" x-cloak
+                     class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-100"
+                     x-transition:enter="transition ease-out duration-100" x-transition:enter-start="transform opacity-0 scale-95" x-transition:enter-end="transform opacity-100 scale-100"
+                     x-transition:leave="transition ease-in duration-75" x-transition:leave-start="transform opacity-100 scale-100" x-transition:leave-end="transform opacity-0 scale-95"
+                     style="display: none;">
+                    <a href="{% url 'withham:post_edit' post.pk %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">編集</a>
+                    <a href="{% url 'withham:post_delete' post.pk %}" class="block px-4 py-2 text-sm text-red-600 hover:bg-red-50">削除</a>
+                </div>
+            </div>
+            {% endif %}
         </div>
 
         {# --- 投稿本文 --- #}
         {% if post.text %}
         <div class="p-4">
-            <p class="text-[#1c140d] text-base leading-relaxed">{{ post.text|linebreaksbr }}</p>
+            <p class="text-[#1c140d] text-base leading-relaxed">{{ post.text|linkify_hashtags|linebreaksbr }}</p>
         </div>
         {% endif %}
 
         {# --- 投稿画像 --- #}
         {% if post.image %}
-            {# 画像クリックでモーダル表示するためのトリガーを設定 #}
             <div class="cursor-pointer open-modal-trigger" data-full-src="{{ post.image.url }}">
                 <img src="{{ post.image.url }}" class="w-full h-auto object-cover" alt="投稿画像">
             </div>
         {% endif %}
 
         {# --- アクションボタンと統計 --- #}
-        <div class="p-4 flex items-center gap-4 text-[#9c7349] border-t border-gray-200">
+        {# ↓↓↓ この div のクラスと中の構造を修正 ↓↓↓ #}
+        <div class="p-4 flex items-center justify-start gap-x-6 gap-y-2 text-[#9c7349] border-t border-gray-200 flex-wrap"> {# justify-start, gap-x-6, flex-wrap を追加/調整 #}
+
             {# いいねボタン/カウント #}
             {% if user.is_authenticated %}
             <button type="button"
                     class="like-button flex items-center gap-1 {% if user in post.likes.all %}text-[#f2800d]{% else %}text-[#9c7349] hover:text-[#f2800d]{% endif %}"
                     data-post-id="{{ post.pk }}"
                     data-like-url="{% url 'withham:toggle_like' post.pk %}">
-                <svg class="like-icon" xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256">
-                    {% if user in post.likes.all %}
-                        <path d="M128,216S24,160,24,94A54,54,0,0,1,78,40c22.59,0,41.94,12.31,50,32,8.06-19.69,27.41-32,50-32a54,54,0,0,1,54,54C232,160,128,216,128,216Z"></path>
-                    {% else %}
-                        <path d="M178,32c-20.65,0-38.73,8.88-50,23.89C116.73,40.88,98.65,32,78,32A62.07,62.07,0,0,0,16,94c0,70,103.79,126.66,108.21,129a8,8,0,0,0,7.58,0C136.21,220.66,240,164,240,94A62.07,62.07,0,0,0,178,32ZM128,206.8C109.74,196.16,32,147.69,32,94A46.06,46.06,0,0,1,78,48c19.45,0,35.78,10.36,42.6,27a8,8,0,0,0,14.8,0c6.82-16.67,23.15-27,42.6-27a46.06,46.06,0,0,1,46,46C224,147.61,146.24,196.15,128,206.8Z"></path>
-                    {% endif %}
+                <svg class="like-icon flex-shrink-0" xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256"> {# flex-shrink-0 追加 #}
+                    {% if user in post.likes.all %} <path d="M128,216S24,160,24,94A54,54,0,0,1,78,40c22.59,0,41.94,12.31,50,32,8.06-19.69,27.41-32,50-32a54,54,0,0,1,54,54C232,160,128,216,128,216Z"></path> {% else %} <path d="M178,32c-20.65,0-38.73,8.88-50,23.89C116.73,40.88,98.65,32,78,32A62.07,62.07,0,0,0,16,94c0,70,103.79,126.66,108.21,129a8,8,0,0,0,7.58,0C136.21,220.66,240,164,240,94A62.07,62.07,0,0,0,178,32ZM128,206.8C109.74,196.16,32,147.69,32,94A46.06,46.06,0,0,1,78,48c19.45,0,35.78,10.36,42.6,27a8,8,0,0,0,14.8,0c6.82-16.67,23.15-27,42.6-27a46.06,46.06,0,0,1,46,46C224,147.61,146.24,196.15,128,206.8Z"></path> {% endif %}
                 </svg>
                 <span class="like-count text-xs font-medium">{{ post.likes.count }}</span>
+                <span class="hidden sm:inline text-xs font-medium ml-1">いいね</span> {# ラベル追加 (任意) #}
             </button>
             {% else %}
                 <span class="flex items-center gap-1 text-[#9c7349]">
-                     <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256"><path d="M178,32c-20.65,0-38.73,8.88-50,23.89C116.73,40.88,98.65,32,78,32A62.07,62.07,0,0,0,16,94c0,70,103.79,126.66,108.21,129a8,8,0,0,0,7.58,0C136.21,220.66,240,164,240,94A62.07,62.07,0,0,0,178,32ZM128,206.8C109.74,196.16,32,147.69,32,94A46.06,46.06,0,0,1,78,48c19.45,0,35.78,10.36,42.6,27a8,8,0,0,0,14.8,0c6.82-16.67,23.15-27,42.6-27a46.06,46.06,0,0,1,46,46C224,147.61,146.24,196.15,128,206.8Z"></path></svg>
+                     <svg class="flex-shrink-0" xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256"><path d="M178,32c-20.65,0-38.73,8.88-50,23.89C116.73,40.88,98.65,32,78,32A62.07,62.07,0,0,0,16,94c0,70,103.79,126.66,108.21,129a8,8,0,0,0,7.58,0C136.21,220.66,240,164,240,94A62.07,62.07,0,0,0,178,32ZM128,206.8C109.74,196.16,32,147.69,32,94A46.06,46.06,0,0,1,78,48c19.45,0,35.78,10.36,42.6,27a8,8,0,0,0,14.8,0c6.82-16.67,23.15-27,42.6-27a46.06,46.06,0,0,1,46,46C224,147.61,146.24,196.15,128,206.8Z"></path></svg>
                     <span class="like-count text-xs font-medium">{{ post.likes.count }}</span>
+                    <span class="hidden sm:inline text-xs font-medium ml-1">いいね</span>
                 </span>
             {% endif %}
 
             {# コメントボタン/カウント (ページ内リンク) #}
             <a href="#comment-form" class="flex items-center gap-1 hover:text-[#1c140d]">
-                 <svg xmlns="http://www.w3.org/2000/svg" width="22px" height="22px" fill="currentColor" viewBox="0 0 256 256"><path d="M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-6.54-.67L40,216,52.47,178.6a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z"></path></svg>
-                 <span class="text-sm font-medium">{{ comments.count }}</span> {# コメント数を表示 #}
+                 <svg class="flex-shrink-0" xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256"><path d="M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-6.54-.67L40,216,52.47,178.6a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z"></path></svg>
+                 <span class="text-xs font-medium">{{ comments.count }}</span>
+                 <span class="hidden sm:inline text-xs font-medium ml-1">コメント</span> {# ラベル追加 (任意) #}
             </a>
             {# シェアボタン/カウント #}
             <button type="button" class="flex items-center gap-1 hover:text-[#1c140d]">
-                <svg xmlns="http://www.w3.org/2000/svg" width="22px" height="22px" fill="currentColor" viewBox="0 0 256 256"><path d="M227.32,28.68a16,16,0,0,0-15.66-4.08l-.15,0L19.57,82.84a16,16,0,0,0-2.42,29.84l85.62,40.55,40.55,85.62A15.86,15.86,0,0,0,157.74,248q.69,0,1.38-.06a15.88,15.88,0,0,0,14-11.51l58.2-191.94c0-.05,0-.1,0-.15A16,16,0,0,0,227.32,28.68ZM157.83,231.85l-.05.14L118.42,148.9l47.24-47.25a8,8,0,0,0-11.31-11.31L107.1,137.58,24,98.22l.14,0L216,40Z"></path></svg>
-                <span class="text-sm font-medium">20</span> {# 仮の数値 #}
+                <svg class="flex-shrink-0" xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256"><path d="M227.32,28.68a16,16,0,0,0-15.66-4.08l-.15,0L19.57,82.84a16,16,0,0,0-2.42,29.84l85.62,40.55,40.55,85.62A15.86,15.86,0,0,0,157.74,248q.69,0,1.38-.06a15.88,15.88,0,0,0,14-11.51l58.2-191.94c0-.05,0-.1,0-.15A16,16,0,0,0,227.32,28.68ZM157.83,231.85l-.05.14L118.42,148.9l47.24-47.25a8,8,0,0,0-11.31-11.31L107.1,137.58,24,98.22l.14,0L216,40Z"></path></svg>
+                <span class="text-xs font-medium">シェア</span> {# 仮の数値削除、ラベルのみ #}
             </button>
-            {# ブックマークボタン #}
+            {# ブックマークボタン (右端に配置) #}
             <button type="button" class="ml-auto hover:text-[#1c140d]">
-                 <svg xmlns="http://www.w3.org/2000/svg" width="22px" height="22px" fill="currentColor" viewBox="0 0 256 256"><path d="M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.76,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32Zm0,177.57l-51.76-32.35a8,8,0,0,0-8.48,0L72,209.57V48H184Z"></path></svg>
+                 <svg class="flex-shrink-0" xmlns="http://www.w3.org/2000/svg" width="22px" height="22px" fill="currentColor" viewBox="0 0 256 256"><path d="M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.76,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32Zm0,177.57l-51.76-32.35a8,8,0,0,0-8.48,0L72,209.57V48H184Z"></path></svg>
             </button>
         </div>
 
         {# --- コメントセクション --- #}
         <div class="p-4 border-t border-gray-100">
-            {# コメント一覧表示エリア #}
-            <div class="space-y-4 mb-6">
+           {# ... (コメント部分は変更なし) ... #}
+           <div class="space-y-4 mb-6">
                 <h3 class="text-base font-semibold text-[#1c140d] mb-4">コメント ({{ comments.count }})</h3>
-
-                {# --- 既存コメントのループ --- #}
                 {% for comment in comments %}
                     <div class="flex items-start gap-3">
                         <a href="{% url 'withham:profile_detail' comment.author.pk %}">
-                            {% if comment.author.profile.avatar %}
-                            <img src="{{ comment.author.profile.avatar.url }}" class="h-8 w-8 rounded-full mt-1 flex-shrink-0 object-cover" alt="{{ comment.author.username }}">
-                            {% else %}
-                            <img src="{% static 'images/default_avatar.png' %}" class="h-8 w-8 rounded-full mt-1 bg-gray-200 flex-shrink-0 object-cover" alt="デフォルトアバター">
-                            {% endif %}
+                            {% if comment.author.profile.avatar %} <img src="{{ comment.author.profile.avatar.url }}" class="h-8 w-8 rounded-full mt-1 flex-shrink-0 object-cover" alt="{{ comment.author.username }}"> {% else %} <img src="{% static 'images/default_avatar.png' %}" class="h-8 w-8 rounded-full mt-1 bg-gray-200 flex-shrink-0 object-cover" alt="デフォルトアバター"> {% endif %}
                         </a>
                         <div class="flex-grow">
-                            <p class="text-sm">
-                                <a href="{% url 'withham:profile_detail' comment.author.pk %}" class="font-medium text-[#1c140d] hover:underline">@{{ comment.author.username }}</a>
-                                <span class="text-[#9c7349] ml-2 text-xs">{{ comment.created_at|timesince }}前</span>
-                            </p>
+                            <p class="text-sm"> <a href="{% url 'withham:profile_detail' comment.author.pk %}" class="font-medium text-[#1c140d] hover:underline">@{{ comment.author.username }}</a> <span class="text-[#9c7349] ml-2 text-xs">{{ comment.created_at|timesince }}前</span> </p>
                             <p class="text-base text-[#1c140d] mt-1">{{ comment.text|linebreaksbr }}</p>
-                            {# コメントへのアクション (いいね、返信など - 仮) #}
-                            {# <div class="flex items-center gap-3 text-xs text-[#9c7349] mt-1">
-                                <button class="hover:underline">いいね！</button>
-                                <button class="hover:underline">返信する</button>
-                            </div> #}
                         </div>
                     </div>
                 {% empty %}
                     <p class="text-sm text-gray-500">まだコメントはありません。</p>
                 {% endfor %}
-                {# --- コメントループここまで --- #}
             </div>
-
-            {# --- コメント投稿フォーム --- #}
-            {# この div に id を追加済み #}
             <div id="comment-form" class="flex items-center gap-3 pt-4 border-t border-gray-100">
                  {% if user.is_authenticated %}
-                 {# ログインユーザーのアバター #}
                  <img src="{% if user.profile.avatar %}{{ user.profile.avatar.url }}{% else %}{% static 'images/default_avatar.png' %}{% endif %}" class="h-8 w-8 rounded-full flex-shrink-0 object-cover" alt="あなたのアバター">
-                 {# コメント入力フォーム #}
-                 <form action="{% url 'withham:post_detail' post.pk %}" method="post" class="flex-grow flex items-center"> {# action を現在のページに設定 #}
+                 <form action="{% url 'withham:post_detail' post.pk %}" method="post" class="flex-grow flex items-center">
                      {% csrf_token %}
-                     {# CommentForm の text フィールドを表示 (Widgetでスタイル指定済み) #}
                      {{ comment_form.text }}
-                     {# エラー表示（任意）#}
-                     {% if comment_form.text.errors %}
-                         <p class="text-red-500 text-xs ml-2">{{ comment_form.text.errors }}</p>
-                     {% endif %}
-
+                     {% if comment_form.text.errors %} <p class="text-red-500 text-xs ml-2">{{ comment_form.text.errors }}</p> {% endif %}
                      <button type="submit" class="ml-2 text-sm font-semibold text-[#f2800d] hover:text-[#1c140d] flex-shrink-0">投稿</button>
                  </form>
                  {% else %}
@@ -143,4 +131,8 @@
         </div>
 
     </div> {# --- 投稿全体のコンテナ終了 --- #}
+
+    {# Alpine.js を読み込む #}
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
 {% endblock %}

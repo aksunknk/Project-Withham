@@ -1,8 +1,9 @@
-{# withham/templates/withham/index.html (いいね機能・モーダル対応) #}
+{# withham/templates/withham/index.html (ハッシュタグリンク適用) #}
 
 {% extends "withham/base.html" %} {# Tailwind適用済みのbase.htmlを継承 #}
 {% load static %}
 {% load humanize %}
+{% load withham_tags %} {# ★ 作成したタグライブラリをロード #}
 
 {% block title %}タイムライン - withham{% endblock %}
 
@@ -45,7 +46,9 @@
                 <a href="{% url 'withham:post_detail' post.pk %}" class="block text-inherit hover:opacity-90">
                     {# 投稿本文 #}
                     {% if post.text %}
-                        <p class="text-[#1c140d] text-base leading-relaxed my-3">{{ post.text|linebreaksbr }}</p>
+                        {# ↓↓↓ フィルターを適用 ↓↓↓ #}
+                        <p class="text-[#1c140d] text-base leading-relaxed my-3">{{ post.text|linkify_hashtags|linebreaksbr }}</p>
+                        {# ↑↑↑ ここまで ↑↑↑ #}
                     {% endif %}
                 </a>
                 {# --- 投稿画像 (モーダル表示トリガー付き) --- #}

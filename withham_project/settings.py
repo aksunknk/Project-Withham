@@ -59,6 +59,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "whitenoise.middleware.WhiteNoiseMiddleware",
 ]
 
 # ルートURL設定ファイル
@@ -160,3 +161,6 @@ MEDIA_URL = '/media/'
 # BASE_DIR は settings.py の上部で定義されているはず
 MEDIA_ROOT = BASE_DIR / 'media'
 # または import os して os.path.join(BASE_DIR, 'media') でも可
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+STORAGES = { "staticfiles": { "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage" } }

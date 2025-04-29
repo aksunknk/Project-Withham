@@ -1,23 +1,26 @@
 # withham/views.py
 
 from django.shortcuts import render, redirect, get_object_or_404
-# ↓↓↓ Q オブジェクトをインポート (複雑な検索用だが今回は部分一致で使用) ↓↓↓
 from django.db.models import Q
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from .models import Post, Hamster, UserProfile, Comment, HealthLog
+# ↓↓↓ Notification, Tag モデルもインポート ↓↓↓
+from .models import Post, Hamster, UserProfile, Comment, HealthLog, Notification, Tag
+# ↓↓↓ SignUpForm もインポート ↓↓↓
 from .forms import PostForm, HamsterForm, UserProfileForm, CommentForm, HealthLogForm, SignUpForm
 from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.views.decorators.http import require_POST
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
+# ↓↓↓ DeleteView, LoginRequiredMixin をインポート ↓↓↓
 from django.views.generic.edit import DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin
+import re # ハッシュタグ用
 
 # Create your views here.
 
-# --- index, post_create, hamster_create, profile_detail, profile_edit, post_detail, toggle_like, health_log_create, health_log_list, hamster_edit, HamsterDeleteView, signup, toggle_follow ビューは省略 ---
+# --- index, post_create, hamster_create, profile_detail, profile_edit, post_detail, toggle_like, health_log_create, health_log_list, hamster_edit, HamsterDeleteView, signup, toggle_follow, following_list, followers_list, search_results, notification_list ビューは省略 ---
 # (前のコードをここに含める)
 # --- トップページ (タイムライン) ---
 def index(request):
@@ -38,7 +41,10 @@ def post_create(request):
         if form.is_valid():
             post = form.save(commit=False)
             post.author = request.user
+            # ★ save() が呼ばれるとモデルのsaveメソッドが実行され、タグが更新される
             post.save()
+            # ★ 通知を作成 (投稿完了後)
+            # ここではフォロワーへの通知などは実装しない (MVP外)
             return redirect('withham:index')
     else:
         form = PostForm()
@@ -124,6 +130,14 @@ def post_detail(request, pk):
             new_comment.post = post
             new_comment.author = request.user
             new_comment.save()
+            # ★ コメント投稿時に通知を作成
+            if post.author != request.user: # 自分自身の投稿へのコメントは通知しない
+                Notification.objects.create(
+                    recipient=post.author,
+                    actor=request.user,
+                    verb=Notification.COMMENT,
+                    target=post
+                )
             return redirect('withham:post_detail', pk=post.pk)
 
     context = {
@@ -149,9 +163,19 @@ def toggle_like(request, post_id):
         else:
             post.likes.add(user)
             liked = True
+            # ★ いいね時に通知を作成
+            if post.author != user: # 自分自身の投稿へのいいねは通知しない (任意)
+                Notification.objects.create(
+                    recipient=post.author,
+                    actor=user,
+                    verb=Notification.LIKE,
+                    target=post
+                )
+
         likes_count = post.likes.count()
         return JsonResponse({'liked': liked, 'likes_count': likes_count})
     except Exception as e:
+        print(f"Error in toggle_like: {e}")
         return JsonResponse({'error': str(e)}, status=400)
 
 # --- 健康記録登録 ---
@@ -253,10 +277,17 @@ def toggle_follow(request, user_pk):
     if request.user == user_to_follow:
         return redirect('withham:profile_detail', pk=user_pk)
 
-    if profile.following.filter(pk=user_pk).exists():
+    is_following_before = profile.following.filter(pk=user_pk).exists()
+
+    if is_following_before:
         profile.following.remove(user_to_follow)
     else:
         profile.following.add(user_to_follow)
+        Notification.objects.create(
+            recipient=user_to_follow,
+            actor=request.user,
+            verb=Notification.FOLLOW
+        )
 
     return redirect('withham:profile_detail', pk=user_pk)
 
@@ -290,23 +321,93 @@ def followers_list(request, pk):
     }
     return render(request, 'withham/follow_list.html', context)
 
-# ★★★ 検索結果表示ビューを追加 ★★★
+# --- 検索結果 ---
 def search_results(request):
     """検索クエリに基づいてユーザーと投稿を検索し、結果を表示する"""
-    query = request.GET.get('q', '') # GETパラメータ 'q' から検索語を取得、なければ空文字
-    found_users = User.objects.none() # 空のQuerySetで初期化
-    found_posts = Post.objects.none() # 空のQuerySetで初期化
+    query = request.GET.get('q', '')
+    found_users = User.objects.none()
+    found_posts = Post.objects.none()
 
-    if query: # 検索語がある場合のみ検索を実行
-        # ユーザー名を検索 (部分一致、大文字小文字区別しない)
+    if query:
         found_users = User.objects.filter(username__icontains=query)
-        # 投稿本文を検索 (部分一致、大文字小文字区別しない)
         found_posts = Post.objects.filter(text__icontains=query).order_by('-created_at')
 
     context = {
-        'query': query,               # 検索語をテンプレートへ
-        'found_users': found_users,   # 見つかったユーザーリストをテンプレートへ
-        'found_posts': found_posts,   # 見つかった投稿リストをテンプレートへ
+        'query': query,
+        'found_users': found_users,
+        'found_posts': found_posts,
     }
     return render(request, 'withham/search_results.html', context)
+
+# --- 通知一覧 ---
+@login_required
+def notification_list(request):
+    """ログインユーザーの通知一覧を表示し、既読にする"""
+    notifications = request.user.notifications.all().order_by('-timestamp')
+    unread_notifications = notifications.filter(is_read=False)
+    unread_notifications.update(is_read=True)
+
+    context = {
+        'notifications': notifications,
+    }
+    return render(request, 'withham/notification_list.html', context)
+
+# --- ハッシュタグ検索 ---
+def hashtag_search(request, tag_name):
+    """指定されたハッシュタグが付いた投稿の一覧を表示する"""
+    tag = get_object_or_404(Tag, name=tag_name.lower())
+    posts = tag.posts.all().order_by('-created_at')
+
+    context = {
+        'tag': tag,
+        'posts': posts,
+    }
+    return render(request, 'withham/hashtag_search_results.html', context)
+
+
+# ★★★ 投稿編集ビューを追加 ★★★
+@login_required
+def post_edit(request, pk):
+    """投稿編集ページ・処理"""
+    post = get_object_or_404(Post, pk=pk)
+    # 投稿者本人でなければアクセス拒否
+    if post.author != request.user:
+        return HttpResponseForbidden("この投稿を編集する権限がありません。")
+
+    if request.method == 'POST':
+        # 既存の投稿インスタンスを指定してフォームを初期化
+        form = PostForm(request.POST, request.FILES, instance=post)
+        if form.is_valid():
+            # ★ save() が呼ばれるとモデルのsaveメソッドが実行され、タグが更新される
+            form.save()
+            # 編集後は投稿詳細ページへリダイレクト
+            return redirect('withham:post_detail', pk=post.pk)
+    else:
+        # GETリクエスト: 既存データで初期化されたフォームを表示
+        form = PostForm(instance=post)
+
+    context = {
+        'form': form,
+        'post': post, # テンプレートで投稿情報を参照する場合
+    }
+    # 新規投稿と同じテンプレート (post_form.html) を再利用
+    return render(request, 'withham/post_form.html', context)
+
+# ★★★ 投稿削除ビューを追加 (クラスベースビュー) ★★★
+class PostDeleteView(LoginRequiredMixin, DeleteView):
+    """投稿削除ビュー (確認画面付き)"""
+    model = Post
+    template_name = 'withham/post_confirm_delete.html' # 削除確認用テンプレート
+
+    # 削除を実行できるのは投稿者のみにするためのチェック
+    def dispatch(self, request, *args, **kwargs):
+        post = self.get_object()
+        if request.user != post.author:
+            return HttpResponseForbidden("この投稿を削除する権限がありません。")
+        return super().dispatch(request, *args, **kwargs)
+
+    # 削除成功後のリダイレクト先 (例: ユーザーのプロフィールページ)
+    def get_success_url(self):
+        # 削除された投稿の作者のプロフィールページへ
+        return reverse_lazy('withham:profile_detail', kwargs={'pk': self.object.author.pk})
 

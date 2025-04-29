@@ -1,185 +1,173 @@
 # withham/models.py
 
 from django.db import models
-from django.contrib.auth.models import User # Django標準のユーザーモデル
-from django.utils import timezone # タイムゾーン対応の日時
-# シグナルを使うためにインポート
+from django.contrib.auth.models import User
+from django.utils import timezone
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+import re # 正規表現モジュール
 
-# =============================================
-# ユーザープロフィール関連
-# =============================================
-
+# --- UserProfile モデル定義 ---
 class UserProfile(models.Model):
-    """ユーザープロフィールモデル"""
-    # 標準のUserモデルと1対1で紐付ける (Userが削除されたらProfileも削除)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
-    # 自己紹介文 (空でもOK)
     bio = models.TextField("自己紹介", blank=True, null=True)
-    # プロフィール画像 (任意アップロード)
     avatar = models.ImageField("プロフィール画像", upload_to='avatars/', null=True, blank=True)
-    # 'self' を使うと UserProfile同士でフォロー関係を持つことになるが、
-    # Userモデルを直接参照する方がシンプルかもしれない。ここではUserを参照する。
-    # symmetrical=False で、AがBをフォローしてもBがAをフォローするとは限らない非対称な関係を示す。
-    # related_name='followers' で user.profile.followers.all() のようにフォロワーを取得できる。
     following = models.ManyToManyField(User, related_name='followers', symmetrical=False, blank=True)
 
     def __str__(self):
-        # 管理画面などでユーザー名を表示
         return self.user.username
 
-    class Meta:
-        verbose_name = 'ユーザープロフィール'
-        verbose_name_plural = 'ユーザープロフィール'
-
-# シグナルレシーバー関数 (UserProfile自動作成用)
+# --- UserProfile シグナル ---
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
-    # 新規ユーザーが作成された(created=True)場合のみ実行
     if created:
-        UserProfile.objects.create(user=instance) # 対応するUserProfileを作成
+        UserProfile.objects.create(user=instance)
 
 @receiver(post_save, sender=User)
 def save_user_profile(sender, instance, **kwargs):
     try:
-        # OneToOneFieldの場合、User保存時に自動で関連profileも保存されることが多いが、
-        # 明示的に呼ぶことで確実性を高める（特にprofileに他のロジックがある場合）
-        # ただし、無限ループにならないよう注意が必要。ここでは単純なsaveのみ。
-        # 存在しない場合のエラーハンドリングも含む。
         if hasattr(instance, 'profile'):
              instance.profile.save()
         else:
-             # シグナルが呼ばれる前にprofileがない場合（通常はありえないが念のため）
              UserProfile.objects.create(user=instance)
     except UserProfile.DoesNotExist:
          UserProfile.objects.create(user=instance)
 
 
-
-# =============================================
-# ハムスター関連
-# =============================================
-
+# --- Hamster モデル定義 ---
 class Hamster(models.Model):
-    """ハムスターのモデル"""
-    # 飼い主 (Userモデルと多対1の関係)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='hamsters', verbose_name='飼い主')
-    # 名前 (必須)
     name = models.CharField('名前', max_length=100)
-    # 種類 (任意)
     breed = models.CharField('種類', max_length=50, blank=True, null=True)
-    # 誕生日 (任意)
     birthday = models.DateField('誕生日', blank=True, null=True)
-    # 性別の選択肢
-    GENDER_CHOICES = [
-        ('M', '男の子'),
-        ('F', '女の子'),
-        ('U', '不明'),
-    ]
-    # 性別 (デフォルトは'不明')
+    GENDER_CHOICES = [('M', '男の子'), ('F', '女の子'), ('U', '不明')]
     gender = models.CharField('性別', max_length=1, choices=GENDER_CHOICES, default='U')
-    # プロフィール文 (任意)
     profile_text = models.TextField('プロフィール', blank=True, null=True)
-    # プロフィール画像 (任意)
     profile_image = models.ImageField('プロフィール画像', upload_to='hamster_images/', blank=True, null=True)
-    # 登録日時 (自動記録)
     created_at = models.DateTimeField('登録日時', default=timezone.now)
 
     def __str__(self):
-        # 管理画面などで「ハムスター名 (飼い主名)」を表示
         return f'{self.name} ({self.owner.username})'
 
     class Meta:
-        # 管理画面での表示名
         verbose_name = 'ハムスター'
         verbose_name_plural = 'ハムスター'
 
-
-# =============================================
-# 投稿・コメント関連
-# =============================================
-
-class Post(models.Model):
-    """投稿のモデル"""
-    # 投稿者 (Userモデルと多対1の関係)
-    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='posts', verbose_name='投稿者')
-    # 関連するハムスター (Hamsterモデルと多対1の関係, 任意)
-    hamster = models.ForeignKey(Hamster, on_delete=models.SET_NULL, blank=True, null=True, related_name='posts', verbose_name='関連ハムスター')
-    # 投稿本文 (必須)
-    text = models.TextField('本文')
-    # 投稿画像 (任意)
-    image = models.ImageField('画像', upload_to='post_images/', blank=True, null=True)
-    # 投稿日時 (自動記録)
-    created_at = models.DateTimeField('投稿日時', default=timezone.now)
-    # いいねしたユーザー (Userモデルと多対多の関係)
-    likes = models.ManyToManyField(User, related_name='liked_posts', blank=True, verbose_name='いいねしたユーザー')
+# --- Tag モデル定義 ---
+class Tag(models.Model):
+    name = models.CharField("タグ名", max_length=50, unique=True)
 
     def __str__(self):
-        # 管理画面などで「Post by ユーザー名 at 日時」を表示
+        return self.name
+
+    class Meta:
+        verbose_name = 'タグ'
+        verbose_name_plural = 'タグ'
+
+# --- Post モデル定義 ---
+class Post(models.Model):
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='posts', verbose_name='投稿者')
+    hamster = models.ForeignKey(Hamster, on_delete=models.SET_NULL, blank=True, null=True, related_name='posts', verbose_name='関連ハムスター')
+    text = models.TextField('本文')
+    image = models.ImageField('画像', upload_to='post_images/', blank=True, null=True)
+    created_at = models.DateTimeField('投稿日時', default=timezone.now)
+    likes = models.ManyToManyField(User, related_name='liked_posts', blank=True, verbose_name='いいねしたユーザー')
+    tags = models.ManyToManyField(Tag, blank=True, related_name='posts', verbose_name='タグ')
+
+    def __str__(self):
         return f'Post by {self.author.username} at {self.created_at.strftime("%Y-%m-%d %H:%M")}'
 
+    def save(self, *args, **kwargs):
+        is_new = self._state.adding # 新規作成かどうかを判定
+        super().save(*args, **kwargs) # まず親クラスのsaveを呼び出してPostを保存
+        # 新規作成時、または本文が変更された場合にタグを更新 (効率化のため)
+        # if is_new or 'text' in kwargs.get('update_fields', []): # update_fieldsを使う場合
+        self.update_tags() # 常に更新する場合 (シンプル)
+
+    def update_tags(self):
+        """投稿本文からハッシュタグを抽出し、関連付ける"""
+        # ↓↓↓ 正規表現を修正 (より多くの文字種に対応) ↓↓↓
+        # \w は英数字アンダースコア、\u3040-\u30ff はひらがな・カタカナ、\u4e00-\u9fff は漢字など
+        hashtags = re.findall(r'#([\w\u3040-\u30ff\u4e00-\u9fff]+)', self.text)
+        # ↑↑↑ 修正ここまで ↑↑↑
+
+        new_tags = []
+        for tag_name in hashtags:
+            # タグ名が長すぎる場合はスキップ (任意)
+            if len(tag_name) > 50: # Tagモデルのmax_lengthに合わせる
+                continue
+            tag, created = Tag.objects.get_or_create(name=tag_name.lower()) # 小文字で統一
+            new_tags.append(tag)
+
+        # set() を使って差分のみを更新
+        current_tags = set(self.tags.all())
+        tags_to_add = set(new_tags) - current_tags
+        tags_to_remove = current_tags - set(new_tags)
+
+        if tags_to_add:
+            self.tags.add(*tags_to_add)
+        if tags_to_remove:
+            self.tags.remove(*tags_to_remove)
+
     class Meta:
-        # 管理画面での表示名
         verbose_name = '投稿'
         verbose_name_plural = '投稿'
-        # デフォルトの並び順 (新しい投稿が上に)
         ordering = ['-created_at']
 
-
+# --- Comment モデル定義 ---
 class Comment(models.Model):
-    """投稿へのコメントモデル"""
-    # 対象となる投稿 (Postモデルと多対1の関係)
-    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='comments', verbose_name='対象投稿')
-    # コメント投稿者 (Userモデルと多対1の関係)
+    post = models.ForeignKey('Post', on_delete=models.CASCADE, related_name='comments', verbose_name='対象投稿')
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='comments', verbose_name='投稿者')
-    # コメント本文 (必須)
     text = models.TextField("本文")
-    # コメント投稿日時 (自動記録)
     created_at = models.DateTimeField("投稿日時", default=timezone.now)
 
-    def __str__(self):
-        # 管理画面などで「ユーザー名: "コメント冒頭..." on 投稿ID」を表示
-        text_summary = self.text[:20] + '...' if len(self.text) > 20 else self.text
-        return f'{self.author.username}: "{text_summary}" on Post {self.post.id}'
-
     class Meta:
-        # 管理画面での表示名
         verbose_name = 'コメント'
         verbose_name_plural = 'コメント'
-        # デフォルトの並び順 (古いコメントが上に)
         ordering = ['created_at']
 
+    def __str__(self):
+        text_summary = self.text[:20] + '...' if len(self.text) > 20 else self.text
+        post_id_str = f'Post {self.post.id}' if self.post else 'Deleted Post'
+        return f'{self.author.username}: "{text_summary}" on {post_id_str}'
 
-# =============================================
-# 健康記録関連
-# =============================================
-
+# --- HealthLog モデル定義 ---
 class HealthLog(models.Model):
-    """ハムスターの健康記録モデル"""
-    # 対象ハムスター (Hamsterモデルと多対1の関係)
     hamster = models.ForeignKey(Hamster, on_delete=models.CASCADE, related_name='health_logs', verbose_name='対象ハムスター')
-    # 記録日 (必須, デフォルトは今日)
     log_date = models.DateField("記録日", default=timezone.now)
-    # 体重(g) (任意, 小数点以下1桁まで)
     weight_g = models.DecimalField("体重(g)", max_digits=4, decimal_places=1, null=True, blank=True)
-    # 様子・メモ (任意)
     notes = models.TextField("様子・メモ", blank=True, null=True)
-    # 記録者 (Userモデルと多対1の関係, 任意)
     recorded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='recorded_health_logs', verbose_name='記録者')
-    # データ作成日時 (自動記録)
     created_at = models.DateTimeField("作成日時", auto_now_add=True)
 
-    def __str__(self):
-        # 管理画面などで「ハムスター名 - 日付」を表示
-        return f"{self.hamster.name} - {self.log_date.strftime('%Y-%m-%d')}"
-
     class Meta:
-        # 管理画面での表示名
         verbose_name = '健康記録'
         verbose_name_plural = '健康記録'
-        # デフォルトの並び順 (記録日の新しい順)
         ordering = ['-log_date', '-created_at']
-        # (任意) 同じハムスターの同じ日付の記録は1つだけにする制約
-        # unique_together = ('hamster', 'log_date')
 
+    def __str__(self):
+        return f"{self.hamster.name} - {self.log_date.strftime('%Y-%m-%d')}"
+
+# --- Notification モデル定義 ---
+class Notification(models.Model):
+    LIKE = 'L'; COMMENT = 'C'; FOLLOW = 'F'
+    NOTIFICATION_TYPES = [(LIKE, 'いいね'), (COMMENT, 'コメント'), (FOLLOW, 'フォロー')]
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications', verbose_name='受信者')
+    actor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='actions', verbose_name='実行者')
+    verb = models.CharField("アクション", max_length=1, choices=NOTIFICATION_TYPES)
+    target = models.ForeignKey('Post', on_delete=models.CASCADE, blank=True, null=True, related_name='notification_target', verbose_name='対象投稿')
+    is_read = models.BooleanField("既読", default=False)
+    timestamp = models.DateTimeField("日時", default=timezone.now)
+
+    class Meta:
+        verbose_name = '通知'
+        verbose_name_plural = '通知'
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        if self.target:
+            return f'{self.actor.username} {self.get_verb_display()} あなたの投稿 ({self.target.pk})'
+        elif self.verb == self.FOLLOW:
+             return f'{self.actor.username} があなたをフォローしました'
+        else:
+            return f'{self.actor.username} {self.get_verb_display()}'

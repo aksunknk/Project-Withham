@@ -1,11 +1,12 @@
-# withham/urls.py
+# withham/urls.py を編集
 
 from django.urls import path
 # Django標準の認証ビューを auth_views としてインポート
 from django.contrib.auth import views as auth_views
 # アプリケーションのビューをインポート
-from .views import HamsterDeleteView # クラスベースビューを個別にインポート
-from . import views                 # viewsモジュール全体をインポート
+# ↓↓↓ PostDeleteView もインポートされているか確認 ↓↓↓
+from .views import HamsterDeleteView, PostDeleteView # クラスベースビューを個別にインポート
+from . import views                 # viewsモジュール全体もインポート
 
 # アプリケーションの名前空間を設定 (テンプレートの {% url %} タグで使用)
 app_name = 'withham'
@@ -19,10 +20,13 @@ auth_patterns = [
 
 # 投稿関連のURLパターン
 post_patterns = [
-    path('', views.index, name='index'),
+    # path('', views.index, name='index'), # indexは独立させるか、ここに含めるか要検討 (プロジェクトurls.pyで''をincludeしているので、ここでは不要かも)
     path('post/new/', views.post_create, name='post_create'),
     path('post/<int:pk>/', views.post_detail, name='post_detail'),
     path('post/<int:post_id>/like/', views.toggle_like, name='toggle_like'),
+    # ★★★ 投稿編集・削除をここに追加 ★★★
+    path('post/<int:pk>/edit/', views.post_edit, name='post_edit'),
+    path('post/<int:pk>/delete/', PostDeleteView.as_view(), name='post_delete'), # ★ クラスベースビューを使うように修正
 ]
 
 # プロフィール関連のURLパターン
@@ -47,32 +51,28 @@ health_log_patterns = [
 # フォロー関連のURLパターン
 follow_patterns = [
     path('users/<int:user_pk>/follow/', views.toggle_follow, name='toggle_follow'),
-]
-
-# フォロー中リスト表示関連のURLパターン
-following_patterns = [
     path('users/<int:pk>/following/', views.following_list, name='following_list'),
-]
-
-# フォロワーリスト表示関連のURLパターン
-followers_patterns = [
     path('users/<int:pk>/followers/', views.followers_list, name='followers_list'),
 ]
 
-# ★★★ 検索結果ページのURLパターンを追加 ★★★
+# 検索結果ページのURLパターン
 search_patterns = [
     path('search/', views.search_results, name='search_results'),
 ]
 
-# すべてのURLパターンを結合
-urlpatterns = (
-    auth_patterns +
-    post_patterns +
-    profile_patterns +
-    hamster_patterns +
-    health_log_patterns +
-    follow_patterns +
-    following_patterns +
-    followers_patterns +
-    search_patterns
-)
+# 通知関連のURLパターン
+notification_patterns = [
+    path('notifications/', views.notification_list, name='notification_list'),
+]
+
+# ハッシュタグ関連のURLパターン
+hashtag_patterns = [
+    path('tags/<str:tag_name>/', views.hashtag_search, name='hashtag_search'),
+]
+
+# すべてのURLパターンを結合 (トップページ '/' は独立させる)
+urlpatterns = [
+    path('', views.index, name='index'), # トップページ
+] + auth_patterns + post_patterns + profile_patterns + hamster_patterns + health_log_patterns + follow_patterns + search_patterns + notification_patterns + hashtag_patterns
+# post_edit_patterns は post_patterns に統合済み
+

@@ -1,0 +1,62 @@
+{# withham/templates/withham/notification_list.html (Tailwind CSS適用版) #}
+
+{% extends "withham/base.html" %} {# Tailwind適用済みのbase.htmlを継承 #}
+{% load static %}
+{% load humanize %}
+
+{% block title %}通知一覧 - withham{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto mt-8 px-4"> {# コンテンツ幅を調整 #}
+    <div class="bg-white p-6 md:p-8 rounded-xl shadow-md border border-gray-200">
+
+        <h2 class="text-2xl font-bold text-[#1c140d] mb-6 pb-4 border-b border-gray-200">通知</h2>
+
+        {# --- 通知リスト --- #}
+        <div class="space-y-3">
+            {% for notification in notifications %}
+                {# 各通知項目 #}
+                {# is_read フラグに応じて背景色を変える #}
+                <a href="{% if notification.target %}{% url 'withham:post_detail' notification.target.pk %}{% elif notification.verb == notification.FOLLOW %}{% url 'withham:profile_detail' notification.actor.pk %}{% else %}#{% endif %}"
+                   class="block p-4 rounded-lg border {% if not notification.is_read %}bg-blue-50 border-blue-200{% else %}bg-white border-gray-100 hover:bg-gray-50{% endif %} transition duration-150 ease-in-out">
+                    <div class="flex items-center gap-3">
+                        {# アクターのアバター #}
+                        <div class="flex-shrink-0">
+                            {% if notification.actor.profile.avatar %}
+                                <img src="{{ notification.actor.profile.avatar.url }}" class="h-10 w-10 rounded-full object-cover" alt="{{ notification.actor.username }}">
+                            {% else %}
+                                <img src="{% static 'images/default_avatar.png' %}" class="h-10 w-10 rounded-full bg-gray-200 object-cover" alt="デフォルトアバター">
+                            {% endif %}
+                        </div>
+                        {# 通知メッセージと日時 #}
+                        <div class="flex-grow min-w-0">
+                            <p class="text-sm text-[#1c140d] leading-snug">
+                                <strong class="font-semibold">{{ notification.actor.username }}</strong>
+                                {% if notification.verb == notification.LIKE %}
+                                    さんがあなたの投稿に「いいね」しました。
+                                {% elif notification.verb == notification.COMMENT %}
+                                    さんがあなたの投稿にコメントしました。
+                                {% elif notification.verb == notification.FOLLOW %}
+                                    さんがあなたをフォローしました。
+                                {% else %}
+                                    {{ notification.get_verb_display }} しました。 {# その他のアクション #}
+                                {% endif %}
+                            </p>
+                            <p class="text-xs text-[#9c7349] mt-1">{{ notification.timestamp|timesince }}前</p>
+                        </div>
+                         {# 未読マーク (任意) #}
+                        {% if not notification.is_read %}
+                            <span class="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full ml-auto" title="未読"></span>
+                        {% endif %}
+                    </div>
+                </a>
+            {% empty %}
+                <p class="text-center text-gray-500 py-6">新しい通知はありません。</p>
+            {% endfor %}
+        </div>
+
+        {# (任意) ページネーション #}
+
+    </div>
+</div>
+{% endblock %}
