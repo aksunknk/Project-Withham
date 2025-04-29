@@ -102,15 +102,19 @@ WSGI_APPLICATION = 'withham_project.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/stable/ref/settings/#databases
 # データベース設定：開発初期はSQLiteで十分です
-DATABASES = {
-    'default': dj_database_url.config(
-        # 環境変数 'DATABASE_URL' から接続情報を読み込む
-        # 未設定の場合は開発用のSQLiteを使う
-        default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
-        conn_max_age=600 # 任意: DB接続の再利用時間
-    )
-}
+DATABASES = {} # まず空の辞書として初期化
 
+# 環境変数 'DATABASE_URL' が設定されているか確認
+if 'DATABASE_URL' in os.environ:
+    # 環境変数があれば、それを使って設定 (Renderなどデプロイ環境向け)
+    DATABASES['default'] = dj_database_url.config(conn_max_age=600)
+else:
+    # 環境変数がなければ、開発用のSQLite設定を使用
+    print("DATABASE_URL environment variable not found. Using SQLite.") # 確認用メッセージ(任意)
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
 
 
 # Password validation
