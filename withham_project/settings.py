@@ -13,12 +13,16 @@ https://docs.djangoproject.com/en/stable/ref/settings/
 
 from pathlib import Path
 import os # MEDIA_ROOT などで os.path.join を使う場合など
-
+import dotenv # 追加
+import dj_database_url # 追加 (ステップ3でインストール済みのはず)
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 # プロジェクトのルートディレクトリを取得
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
+# .env ファイルを読み込む (開発環境用)
+dotenv_path = BASE_DIR / '.env'
+if dotenv_path.exists():
+    dotenv.load_dotenv(dotenv_path=dotenv_path)
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/stable/howto/deployment/checklist/
 
@@ -27,15 +31,24 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ここにはDjangoが自動生成した実際のシークレットキーが入ります。
 # 絶対に公開しないでください。
 # ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-SECRET_KEY = 'django-insecure-your-secret-key-here'
+SECRET_KEY = os.environ.get('SESECRET_CRET_KEY')
 
+if not SECRET_KEY:
+    # raise ValueError("SECRET_KEY environment variable not set.") # エラーにする場合
+    print("Warning: SECRET_KEY environment variable not set, using default (unsafe).")
 # SECURITY WARNING: don't run with debug turned on in production!
 # 開発中はTrue、本番環境ではFalseにします
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'True') != 'False'
 
 # 開発中は空でOK、本番環境では許可するホスト名（ドメイン名）を設定します
 ALLOWED_HOSTS = []
-
+RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+# 開発用にローカルホストも追加しておく (任意)
+if DEBUG:
+    ALLOWED_HOSTS.append('127.0.0.1')
+    ALLOWED_HOSTS.append('localhost')
 
 # Application definition
 # アプリケーション定義：作成したアプリや利用するDjango標準アプリを登録します
@@ -90,11 +103,14 @@ WSGI_APPLICATION = 'withham_project.wsgi.application'
 # https://docs.djangoproject.com/en/stable/ref/settings/#databases
 # データベース設定：開発初期はSQLiteで十分です
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3', # SQLiteファイルへのパス
-    }
+    'default': dj_database_url.config(
+        # 環境変数 'DATABASE_URL' から接続情報を読み込む
+        # 未設定の場合は開発用のSQLiteを使う
+        default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
+        conn_max_age=600 # 任意: DB接続の再利用時間
+    )
 }
+
 
 
 # Password validation
