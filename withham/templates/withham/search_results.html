@@ -1,0 +1,140 @@
+{# withham/templates/withham/search_results.html (Tailwind CSS適用版) #}
+
+{% extends "withham/base.html" %} {# Tailwind適用済みのbase.htmlを継承 #}
+{% load static %}
+{% load humanize %}
+
+{% block title %}検索結果{% if query %}: {{ query }}{% endif %} - withham{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto mt-8 px-4"> {# コンテンツ幅を調整 #}
+
+    {# --- 検索フォーム --- #}
+    <form method="get" action="{% url 'withham:search_results' %}" class="mb-6">
+        <label for="search-input" class="block text-sm font-medium text-gray-700 mb-1">検索</label>
+        <div class="relative">
+            <input type="search" name="q" id="search-input"
+                   class="block w-full rounded-lg border-gray-300 bg-white shadow-sm focus:border-[#f2800d] focus:ring focus:ring-[#f2800d] focus:ring-opacity-50 py-2 pl-10 pr-4"
+                   placeholder="ユーザー名や投稿内容で検索..."
+                   value="{{ query|default_if_none:"" }}">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                </svg>
+            </div>
+        </div>
+        {# <button type="submit" class="mt-2 ...">検索</button> #} {# ボタンはなくてもEnterで検索可能 #}
+    </form>
+
+    {# --- 検索結果表示 --- #}
+    {% if query %} {# 検索語がある場合のみ結果を表示 #}
+        <h2 class="text-xl font-semibold text-[#1c140d] mb-4">「{{ query }}」の検索結果</h2>
+
+        {# --- ユーザー検索結果 --- #}
+        <div class="mb-6">
+            <h3 class="text-lg font-medium text-gray-800 border-b pb-2 mb-3">ユーザー</h3>
+            {% if found_users %}
+                <div class="space-y-3">
+                    {% for found_user in found_users %}
+                        <div class="flex items-center justify-between gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                            <a href="{% url 'withham:profile_detail' found_user.pk %}" class="flex items-center gap-3 flex-grow min-w-0">
+                                {% if found_user.profile.avatar %}
+                                    <img src="{{ found_user.profile.avatar.url }}" class="h-10 w-10 rounded-full object-cover flex-shrink-0" alt="{{ found_user.username }}">
+                                {% else %}
+                                    <img src="{% static 'images/default_avatar.png' %}" class="h-10 w-10 rounded-full bg-gray-200 object-cover flex-shrink-0" alt="デフォルトアバター">
+                                {% endif %}
+                                <span class="text-sm font-medium text-[#1c140d] truncate">{{ found_user.username }}</span>
+                            </a>
+                            {# フォローボタンなどを追加する場合 (follow_list.html参照) #}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-sm text-gray-500">一致するユーザーは見つかりませんでした。</p>
+            {% endif %}
+        </div>
+
+        {# --- 投稿検索結果 --- #}
+        <div>
+            <h3 class="text-lg font-medium text-gray-800 border-b pb-2 mb-3">投稿</h3>
+            {% if found_posts %}
+                <div class="space-y-4">
+                    {% for post in found_posts %}
+                        {# index.htmlの投稿カード表示を再利用 #}
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+                            <div class="p-4">
+                                <div class="flex justify-between items-center mb-3">
+                                   <div class="flex items-center gap-3">
+                                        <a href="{% url 'withham:profile_detail' post.author.pk %}">
+                                            {% if post.author.profile.avatar %}
+                                            <img src="{{ post.author.profile.avatar.url }}" class="h-12 w-12 rounded-full object-cover" alt="{{ post.author.username }}">
+                                            {% else %}
+                                            <img src="{% static 'images/default_avatar.png' %}" class="h-12 w-12 rounded-full bg-gray-200 object-cover" alt="デフォルトアバター">
+                                            {% endif %}
+                                        </a>
+                                        <div>
+                                            <a href="{% url 'withham:profile_detail' post.author.pk %}" class="text-[#1c140d] text-base font-medium leading-normal hover:underline">@{{ post.author.username }}</a>
+                                            {% if post.hamster %}
+                                                 <span class="ml-2 inline-block bg-[#e0f2fe] text-[#0ea5e9] text-xs font-medium px-2 py-0.5 rounded-full">🐹 {{ post.hamster.name }}</span>
+                                            {% endif %}
+                                            <p class="text-[#9c7349] text-sm font-normal leading-normal">{{ post.created_at|timesince }}前</p>
+                                        </div>
+                                    </div>
+                                     <button class="ml-auto text-gray-500 hover:text-gray-700">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256"><path d="M144,128a16,16,0,1,1-16-16A16,16,0,0,1,144,128ZM128,64a16,16,0,1,0-16-16A16,16,0,0,0,128,64Zm0,128a16,16,0,1,0,16,16A16,16,0,0,0,128,192Z"></path></svg>
+                                     </button>
+                                </div>
+                                <a href="{% url 'withham:post_detail' post.pk %}" class="block text-inherit hover:opacity-90">
+                                    {% if post.text %}
+                                        <p class="text-[#1c140d] text-base leading-relaxed my-3">{{ post.text|linebreaksbr }}</p>
+                                    {% endif %}
+                                </a>
+                                {% if post.image %}
+                                    <div class="my-3 cursor-pointer open-modal-trigger"
+                                         data-full-src="{{ post.image.url }}">
+                                        <div class="aspect-video w-full overflow-hidden rounded-lg bg-gray-100">
+                                            <img src="{{ post.image.url }}"
+                                                 class="w-full h-full object-cover"
+                                                 alt="投稿画像 {{ post.id }}">
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                <div class="flex items-center gap-4 text-[#9c7349] pt-3 border-t border-gray-100">
+                                     <a href="{% url 'withham:post_detail' post.pk %}#comment-form" class="flex items-center gap-1 hover:text-[#1c140d]">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256"><path d="M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-6.54-.67L40,216,52.47,178.6a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z"></path></svg>
+                                        <span class="text-xs font-medium">{{ post.comments.count }}</span>
+                                    </a>
+                                    {% if user.is_authenticated %}
+                                    <button type="button"
+                                            class="like-button flex items-center gap-1 {% if user in post.likes.all %}text-[#f2800d]{% else %}text-[#9c7349] hover:text-[#f2800d]{% endif %}"
+                                            data-post-id="{{ post.pk }}"
+                                            data-like-url="{% url 'withham:toggle_like' post.pk %}">
+                                        <svg class="like-icon" xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256">
+                                            {% if user in post.likes.all %} <path d="M128,216S24,160,24,94A54,54,0,0,1,78,40c22.59,0,41.94,12.31,50,32,8.06-19.69,27.41-32,50-32a54,54,0,0,1,54,54C232,160,128,216,128,216Z"></path> {% else %} <path d="M178,32c-20.65,0-38.73,8.88-50,23.89C116.73,40.88,98.65,32,78,32A62.07,62.07,0,0,0,16,94c0,70,103.79,126.66,108.21,129a8,8,0,0,0,7.58,0C136.21,220.66,240,164,240,94A62.07,62.07,0,0,0,178,32ZM128,206.8C109.74,196.16,32,147.69,32,94A46.06,46.06,0,0,1,78,48c19.45,0,35.78,10.36,42.6,27a8,8,0,0,0,14.8,0c6.82-16.67,23.15-27,42.6-27a46.06,46.06,0,0,1,46,46C224,147.61,146.24,196.15,128,206.8Z"></path> {% endif %}
+                                        </svg>
+                                        <span class="like-count text-xs font-medium">{{ post.likes.count }}</span>
+                                    </button>
+                                    {% else %}
+                                        <span class="flex items-center gap-1 text-[#9c7349]"> <svg>...</svg> <span class="like-count text-xs font-medium">{{ post.likes.count }}</span> </span>
+                                    {% endif %}
+                                    <button type="button" class="flex items-center gap-1 hover:text-[#1c140d]"> <svg>...</svg> <span class="text-xs font-medium">シェア</span> </button>
+                                    <button type="button" class="ml-auto hover:text-[#1c140d]"> <svg>...</svg> </button>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                 <p class="text-sm text-gray-500">一致する投稿は見つかりませんでした。</p>
+            {% endif %}
+        </div>
+
+    {% elif request.GET.q is not None %} {# 検索語はあるが空の場合 (検索ボタン押下など) #}
+         <p class="text-center text-gray-500 py-4">検索語を入力してください。</p>
+    {% else %}
+        {# ページ初回アクセス時 (検索前) の表示 #}
+        <p class="text-center text-gray-500 py-4">ユーザー名や投稿内容で検索できます。</p>
+    {% endif %}
+
+</div>
+{% endblock %}

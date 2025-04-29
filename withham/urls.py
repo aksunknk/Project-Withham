@@ -59,6 +59,11 @@ followers_patterns = [
     path('users/<int:pk>/followers/', views.followers_list, name='followers_list'),
 ]
 
+# ★★★ 検索結果ページのURLパターンを追加 ★★★
+search_patterns = [
+    path('search/', views.search_results, name='search_results'),
+]
+
 # すべてのURLパターンを結合
 urlpatterns = (
     auth_patterns +
@@ -68,5 +73,6 @@ urlpatterns = (
     health_log_patterns +
     follow_patterns +
     following_patterns +
-    followers_patterns
+    followers_patterns +
+    search_patterns
 )

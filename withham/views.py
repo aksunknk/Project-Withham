@@ -1,6 +1,7 @@
 # withham/views.py
 
 from django.shortcuts import render, redirect, get_object_or_404
+# ↓↓↓ Q オブジェクトをインポート (複雑な検索用だが今回は部分一致で使用) ↓↓↓
 from django.db.models import Q
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
@@ -259,39 +260,53 @@ def toggle_follow(request, user_pk):
 
     return redirect('withham:profile_detail', pk=user_pk)
 
-# ★★★ フォロー中リスト表示ビューを追加 ★★★
+# --- フォロー中リスト ---
 def following_list(request, pk):
     """指定されたユーザーがフォローしているユーザーの一覧を表示"""
     profile_user = get_object_or_404(User, pk=pk)
-    # UserProfileのfollowingフィールドからフォローしているUserを取得
     try:
         following_users = profile_user.profile.following.all()
     except UserProfile.DoesNotExist:
-        following_users = User.objects.none() # プロフィールがない場合は空
-
-    context = {
-        'profile_user': profile_user, # 誰のリストかを表示するため
-        'user_list': following_users, # テンプレートに渡すユーザーリスト
-        'list_type': 'フォロー中'       # テンプレートでタイトル表示などに使う
-    }
-    # フォロワーリストと共通のテンプレートを使う
-    return render(request, 'withham/follow_list.html', context)
-
-# ★★★ フォロワーリスト表示ビューを追加 ★★★
-def followers_list(request, pk):
-    """指定されたユーザーをフォローしているユーザーの一覧を表示"""
-    profile_user = get_object_or_404(User, pk=pk)
-    # Userモデルのrelated_name='followers'を使ってフォロワーを取得
-    follower_users = profile_user.followers.all() # これはUserProfileのリストになるので注意
-
-    # UserProfileのリストからUserのリストを取得する (少し冗長だが確実)
-    followers = User.objects.filter(profile__in=follower_users)
+        following_users = User.objects.none()
 
     context = {
         'profile_user': profile_user,
-        'user_list': followers, # テンプレートに渡すユーザーリスト
-        'list_type': 'フォロワー' # テンプレートでタイトル表示などに使う
+        'user_list': following_users,
+        'list_type': 'フォロー中'
     }
-    # フォロー中リストと共通のテンプレートを使う
     return render(request, 'withham/follow_list.html', context)
+
+# --- フォロワーリスト ---
+def followers_list(request, pk):
+    """指定されたユーザーをフォローしているユーザーの一覧を表示"""
+    profile_user = get_object_or_404(User, pk=pk)
+    follower_profiles = profile_user.followers.all() # UserProfileのリスト
+    followers = User.objects.filter(profile__in=follower_profiles) # Userのリストに変換
+
+    context = {
+        'profile_user': profile_user,
+        'user_list': followers,
+        'list_type': 'フォロワー'
+    }
+    return render(request, 'withham/follow_list.html', context)
+
+# ★★★ 検索結果表示ビューを追加 ★★★
+def search_results(request):
+    """検索クエリに基づいてユーザーと投稿を検索し、結果を表示する"""
+    query = request.GET.get('q', '') # GETパラメータ 'q' から検索語を取得、なければ空文字
+    found_users = User.objects.none() # 空のQuerySetで初期化
+    found_posts = Post.objects.none() # 空のQuerySetで初期化
+
+    if query: # 検索語がある場合のみ検索を実行
+        # ユーザー名を検索 (部分一致、大文字小文字区別しない)
+        found_users = User.objects.filter(username__icontains=query)
+        # 投稿本文を検索 (部分一致、大文字小文字区別しない)
+        found_posts = Post.objects.filter(text__icontains=query).order_by('-created_at')
+
+    context = {
+        'query': query,               # 検索語をテンプレートへ
+        'found_users': found_users,   # 見つかったユーザーリストをテンプレートへ
+        'found_posts': found_posts,   # 見つかった投稿リストをテンプレートへ
+    }
+    return render(request, 'withham/search_results.html', context)
 
