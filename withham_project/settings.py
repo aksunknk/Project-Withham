@@ -31,7 +31,7 @@ if dotenv_path.exists():
 # ここにはDjangoが自動生成した実際のシークレットキーが入ります。
 # 絶対に公開しないでください。
 # ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-SECRET_KEY = os.environ.get('SESECRET_CRET_KEY')
+SECRET_KEY = os.environ.get('SECRET_KEY')
 
 if not SECRET_KEY:
     # raise ValueError("SECRET_KEY environment variable not set.") # エラーにする場合
