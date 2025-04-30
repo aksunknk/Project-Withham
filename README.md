@@ -80,7 +80,7 @@ npm run build:css
 ```bash
 python manage.py runserver
 ```
-[](
+<!-- 
 ## デプロイメント\
 
  Herokuへのデプロイ\
@@ -95,7 +95,7 @@ heroku create\
 git push heroku main\
 heroku run python manage.py migrate\
 ```\
-)
+-->
 
 ## ライセンス
 このプロジェクトはMITライセンスの下で公開されています。
