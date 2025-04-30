@@ -83,12 +83,12 @@ python manage.py runserver
 [](
 ## デプロイメント\
 
-## ### Herokuへのデプロイ\
-## 1. Heroku CLIをインストール\
-## 2. Herokuにログイン\
-## 3. アプリケーションを作成\
-## 4. 環境変数を設定\
-## 5. デプロイ\
+ Herokuへのデプロイ\
+ 1. Heroku CLIをインストール\
+ 2. Herokuにログイン\
+ 3. アプリケーションを作成\
+ 4. 環境変数を設定\
+ 5. デプロイ\
 
 ```bash\
 heroku create\
