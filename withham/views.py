@@ -5,11 +5,12 @@ from django.db.models import Q
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-# ↓↓↓ Notification, Tag モデルもインポート ↓↓↓
+# ↓↓↓ Notification, Tag, Comment モデルもインポート ↓↓↓
 from .models import Post, Hamster, UserProfile, Comment, HealthLog, Notification, Tag
 # ↓↓↓ SignUpForm もインポート ↓↓↓
 from .forms import PostForm, HamsterForm, UserProfileForm, CommentForm, HealthLogForm, SignUpForm
 from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseForbidden
+# ↓↓↓ require_POST をインポート ↓↓↓
 from django.views.decorators.http import require_POST
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -20,7 +21,7 @@ import re # ハッシュタグ用
 
 # Create your views here.
 
-# --- index, post_create, hamster_create, profile_detail, profile_edit, post_detail, toggle_like, health_log_create, health_log_list, hamster_edit, HamsterDeleteView, signup, toggle_follow, following_list, followers_list, search_results, notification_list ビューは省略 ---
+# --- index, post_create, hamster_create, profile_detail, profile_edit, post_detail, toggle_like, health_log_create, health_log_list, hamster_edit, HamsterDeleteView, signup, toggle_follow, following_list, followers_list, search_results, notification_list, hashtag_search, post_edit, PostDeleteView ビューは省略 ---
 # (前のコードをここに含める)
 # --- トップページ (タイムライン) ---
 def index(request):
@@ -70,27 +71,32 @@ def hamster_create(request):
 # --- プロフィール詳細 ---
 def profile_detail(request, pk):
     """ユーザープロフィール詳細ページ"""
-    profile_user = get_object_or_404(User, pk=pk)
-    posts = Post.objects.filter(author=profile_user).order_by('-created_at')
-    hamsters = Hamster.objects.filter(owner=profile_user)
+    # ↓↓↓ 変数名を profile_user から target_user に変更 ↓↓↓
+    target_user = get_object_or_404(User, pk=pk)
+    posts = Post.objects.filter(author=target_user).order_by('-created_at')
+    hamsters = Hamster.objects.filter(owner=target_user)
 
     is_following = False
     following_count = 0
     followers_count = 0
 
     try:
-        profile = profile_user.profile
+        # ↓↓↓ target_user を使用 ↓↓↓
+        profile = target_user.profile
         following_count = profile.following.count()
-        followers_count = profile_user.followers.count() # Userモデルのrelated_nameを使用
+        # ↓↓↓ target_user を使用 ↓↓↓
+        followers_count = target_user.followers.count()
 
         if request.user.is_authenticated:
-            is_following = request.user.profile.following.filter(pk=profile_user.pk).exists()
+            # ↓↓↓ target_user を使用 ↓↓↓
+            is_following = request.user.profile.following.filter(pk=target_user.pk).exists()
 
     except UserProfile.DoesNotExist:
         pass
 
     context = {
-        'profile_user': profile_user,
+        # ↓↓↓ 変数名を変更して渡す ↓↓↓
+        'target_user': target_user,
         'posts': posts,
         'hamsters': hamsters,
         'is_following': is_following,
@@ -121,7 +127,7 @@ def post_detail(request, pk):
     comments = post.comments.all().order_by('created_at')
     comment_form = CommentForm()
 
-    if request.method == 'POST':
+    if request.method == 'POST': # コメント投稿処理
         if not request.user.is_authenticated:
              return HttpResponseForbidden("コメントするにはログインが必要です。")
         comment_form = CommentForm(request.POST)
@@ -130,8 +136,8 @@ def post_detail(request, pk):
             new_comment.post = post
             new_comment.author = request.user
             new_comment.save()
-            # ★ コメント投稿時に通知を作成
-            if post.author != request.user: # 自分自身の投稿へのコメントは通知しない
+            # コメント投稿時に通知を作成
+            if post.author != request.user:
                 Notification.objects.create(
                     recipient=post.author,
                     actor=request.user,
@@ -163,15 +169,13 @@ def toggle_like(request, post_id):
         else:
             post.likes.add(user)
             liked = True
-            # ★ いいね時に通知を作成
-            if post.author != user: # 自分自身の投稿へのいいねは通知しない (任意)
+            if post.author != user:
                 Notification.objects.create(
                     recipient=post.author,
                     actor=user,
                     verb=Notification.LIKE,
                     target=post
                 )
-
         likes_count = post.likes.count()
         return JsonResponse({'liked': liked, 'likes_count': likes_count})
     except Exception as e:
@@ -364,50 +368,58 @@ def hashtag_search(request, tag_name):
     }
     return render(request, 'withham/hashtag_search_results.html', context)
 
-
-# ★★★ 投稿編集ビューを追加 ★★★
+# --- 投稿編集 ---
 @login_required
 def post_edit(request, pk):
     """投稿編集ページ・処理"""
     post = get_object_or_404(Post, pk=pk)
-    # 投稿者本人でなければアクセス拒否
     if post.author != request.user:
         return HttpResponseForbidden("この投稿を編集する権限がありません。")
 
     if request.method == 'POST':
-        # 既存の投稿インスタンスを指定してフォームを初期化
         form = PostForm(request.POST, request.FILES, instance=post)
         if form.is_valid():
-            # ★ save() が呼ばれるとモデルのsaveメソッドが実行され、タグが更新される
-            form.save()
-            # 編集後は投稿詳細ページへリダイレクト
+            form.save() # saveメソッド内でタグ更新も行われる
             return redirect('withham:post_detail', pk=post.pk)
     else:
-        # GETリクエスト: 既存データで初期化されたフォームを表示
         form = PostForm(instance=post)
 
     context = {
         'form': form,
-        'post': post, # テンプレートで投稿情報を参照する場合
+        'post': post,
     }
-    # 新規投稿と同じテンプレート (post_form.html) を再利用
     return render(request, 'withham/post_form.html', context)
 
-# ★★★ 投稿削除ビューを追加 (クラスベースビュー) ★★★
+# --- 投稿削除 ---
 class PostDeleteView(LoginRequiredMixin, DeleteView):
     """投稿削除ビュー (確認画面付き)"""
     model = Post
-    template_name = 'withham/post_confirm_delete.html' # 削除確認用テンプレート
+    template_name = 'withham/post_confirm_delete.html'
 
-    # 削除を実行できるのは投稿者のみにするためのチェック
     def dispatch(self, request, *args, **kwargs):
         post = self.get_object()
         if request.user != post.author:
             return HttpResponseForbidden("この投稿を削除する権限がありません。")
         return super().dispatch(request, *args, **kwargs)
 
-    # 削除成功後のリダイレクト先 (例: ユーザーのプロフィールページ)
     def get_success_url(self):
-        # 削除された投稿の作者のプロフィールページへ
         return reverse_lazy('withham:profile_detail', kwargs={'pk': self.object.author.pk})
+
+
+# ★★★ コメント削除ビューを追加 ★★★
+@login_required
+@require_POST # 安全のためPOSTリクエストのみ受け付ける
+def comment_delete(request, pk):
+    """コメントを削除する"""
+    comment = get_object_or_404(Comment, pk=pk)
+    post_pk = comment.post.pk # リダイレクト用に投稿IDを保持
+
+    # コメント投稿者本人か、または投稿の作者であれば削除可能にする (任意)
+    # ここではコメント投稿者本人のみ削除可能とする
+    if comment.author != request.user:
+        return HttpResponseForbidden("このコメントを削除する権限がありません。")
+
+    comment.delete()
+    # 削除後は元の投稿詳細ページにリダイレクト
+    return redirect('withham:post_detail', pk=post_pk)
 

@@ -1,10 +1,11 @@
-{# withham/templates/withham/profile_detail.html (フォロー/フォロワー数リンク追加) #}
+{# withham/templates/withham/profile_detail.html (最新版) #}
 
 {% extends "withham/base.html" %} {# Tailwind適用済みのbase.htmlを継承 #}
 {% load static %} {# デフォルトアバター/ハムスター画像表示のために static をロード #}
 {% load humanize %} {# timesinceフィルタのために humanize をロード #}
+{% load withham_tags %} {# ハッシュタグリンク用カスタムタグ #}
 
-{% block title %}{{ profile_user.username }}のプロフィール - withham{% endblock %} {# ページのタイトル #}
+{% block title %}{{ target_user.username }}のプロフィール - withham{% endblock %} {# ページのタイトル #}
 
 {% block content %} {# contentブロックを上書き #}
 
@@ -13,36 +14,41 @@
         <div class="flex flex-col sm:flex-row items-center">
             {# アバター画像 #}
             <div class="flex-shrink-0 mb-4 sm:mb-0 sm:mr-6">
-                {% if profile_user.profile.avatar %}
-                    <img src="{{ profile_user.profile.avatar.url }}" class="h-24 w-24 rounded-full object-cover border-2 border-white shadow-md" alt="{{ profile_user.username }}のプロフィール画像">
+                {% if target_user.profile.avatar %} {# 変数名を target_user に変更 #}
+                    <img src="{{ target_user.profile.avatar.url }}" class="h-24 w-24 rounded-full object-cover border-2 border-white shadow-md" alt="{{ target_user.username }}のプロフィール画像">
                 {% else %}
                     <img src="{% static 'images/default_avatar.png' %}" class="h-24 w-24 rounded-full object-cover border-2 border-white shadow-md bg-gray-200" alt="デフォルトアバター">
+                    {# ↑ default_avatar.png は用意した画像ファイル名・パスに変更してください (staticディレクトリに画像が必要) #}
                 {% endif %}
             </div>
 
             <div class="flex-grow-1 text-center sm:text-left">
                 {# ユーザー名 #}
-                <h2 class="text-2xl font-bold text-[#1c140d] mb-1">{{ profile_user.username }}</h2>
+                <h2 class="text-2xl font-bold text-[#1c140d] mb-1">{{ target_user.username }}</h2> {# 変数名を target_user に変更 #}
                 {# 自己紹介文 #}
-                {% if profile_user.profile.bio %}
-                    <p class="text-[#9c7349] text-base leading-relaxed mb-3">{{ profile_user.profile.bio|linebreaksbr }}</p>
+                {% if target_user.profile.bio %} {# 変数名を target_user に変更 #}
+                    <p class="text-[#9c7349] text-base leading-relaxed mb-3">{{ target_user.profile.bio|linebreaksbr }}</p>
                 {% else %}
-                    {% if request.user == profile_user %}
+                    {% if request.user == target_user %} {# 変数名を target_user に変更 #}
                     <p class="text-gray-500 italic mb-3">自己紹介文を編集してみましょう！</p>
                     {% endif %}
                 {% endif %}
                 {# 編集ボタン / フォローボタン #}
-                {% if request.user.is_authenticated %}
-                    {% if request.user == profile_user %}
+                {% if request.user.is_authenticated %} {# ログインしている場合のみ表示 #}
+                    {% if request.user == target_user %} {# 変数名を target_user に変更 #}
+                        {# 自分のプロフィールの場合: 編集ボタン #}
                         <a href="{% url 'withham:profile_edit' %}" class="inline-block bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-4 rounded-full text-sm">プロフィールを編集</a>
                     {% else %}
-                        <form action="{% url 'withham:toggle_follow' profile_user.pk %}" method="post" class="inline">
+                        {# 他人のプロフィールの場合: フォロー/アンフォローボタン #}
+                        <form action="{% url 'withham:toggle_follow' target_user.pk %}" method="post" class="inline"> {# 変数名を target_user に変更 #}
                             {% csrf_token %}
                             {% if is_following %}
+                                {# フォロー中の場合: アンフォローボタン #}
                                 <button type="submit" class="inline-block bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-1 px-4 rounded-full text-sm">
                                     フォロー解除
                                 </button>
                             {% else %}
+                                {# フォローしていない場合: フォローボタン #}
                                 <button type="submit" class="inline-block bg-[#f2800d] hover:opacity-90 text-[#1c140d] font-bold py-1 px-4 rounded-full text-sm">
                                     フォローする
                                 </button>
@@ -52,46 +58,49 @@
                 {% endif %}
             </div>
         </div>
-         {# ▼▼▼ フォロー・フォロワー数の表示 (リンクに変更) ▼▼▼ #}
+         {# フォロー・フォロワー数の表示 (リンク付き) #}
          <div class="mt-4 pt-4 border-t border-gray-200 flex gap-4 justify-center sm:justify-start">
-            {# フォロー中の数 (リンクに変更) #}
-            <a href="{% url 'withham:following_list' profile_user.pk %}" class="text-sm text-gray-600 hover:underline">
+            <a href="{% url 'withham:following_list' target_user.pk %}" class="text-sm text-gray-600 hover:underline"> {# 変数名を target_user に変更 #}
                 <strong class="font-medium text-[#1c140d]">{{ following_count }}</strong> フォロー中
             </a>
-            {# フォロワー数 (リンクに変更) #}
-            <a href="{% url 'withham:followers_list' profile_user.pk %}" class="text-sm text-gray-600 hover:underline">
+            <a href="{% url 'withham:followers_list' target_user.pk %}" class="text-sm text-gray-600 hover:underline"> {# 変数名を target_user に変更 #}
                 <strong class="font-medium text-[#1c140d]">{{ followers_count }}</strong> フォロワー
             </a>
         </div>
-        {# ▲▲▲ ここまで ▲▲▲ #}
     </div>
 
     {# --- ハムスター一覧表示エリア --- #}
     <div class="hamster-section mb-6">
         <h3 class="text-xl font-bold text-[#1c140d] mb-4">🐹 このユーザーのハムスター</h3>
-        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {% for hamster in hamsters %}
-                <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200 text-center flex flex-col">
-                    <a href="{% url 'withham:health_log_list' hamster.pk %}" class="block group relative flex-grow"> {# ★ ハムスター名から記録一覧へリンク #}
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"> {# Tailwind Gridで配置 #}
+            {% for hamster in hamsters %} {# ビューから 'hamsters' を渡す #}
+                <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200 text-center flex flex-col"> {# flex flex-col を追加 #}
+                    {# ハムスター詳細へのリンク (健康記録一覧へ) #}
+                    <a href="{% url 'withham:health_log_list' hamster.pk %}" class="block group relative flex-grow"> {# flex-grow を追加 #}
                         {% if hamster.profile_image %}
                             <img src="{{ hamster.profile_image.url }}" class="w-full aspect-square object-cover group-hover:opacity-90 transition-opacity" alt="{{ hamster.name }}">
                         {% else %}
                             <img src="{% static 'images/default_hamster_icon.svg' %}" class="w-full aspect-square object-contain p-4 bg-gray-100 group-hover:opacity-90 transition-opacity" alt="デフォルト画像">
+                            {# ↑ default_hamster_icon.svg は適切な画像ファイル名・パスに変更してください #}
                         {% endif %}
                         <div class="p-2">
                             <h4 class="text-sm font-medium text-[#1c140d] truncate">{{ hamster.name }}</h4>
                         </div>
                     </a>
-                    {% if request.user == profile_user %}
-                    <div class="p-2 border-t border-gray-100 flex justify-around items-center text-xs">
+                     {# 自分のプロフィールの場合のみ操作リンクを表示 #}
+                    {% if request.user == target_user %} {# 変数名を target_user に変更 #}
+                    <div class="p-2 border-t border-gray-100 flex justify-around items-center text-xs"> {# flex justify-around items-center を追加 #}
+                        {# 健康記録リンク #}
                         <a href="{% url 'withham:health_log_create' hamster.pk %}" class="text-green-600 hover:text-green-800 font-medium" title="記録する">
                             <svg xmlns="http://www.w3.org/2000/svg" width="1.1em" height="1.1em" fill="currentColor" class="inline-block" viewBox="0 0 16 16"> <path d="M8.5 6.5A.5.5 0 0 0 8 7v6a.5.5 0 0 0 1 0V7a.5.5 0 0 0-.5-.5z"/> <path d="M12.354 10.354a.5.5 0 0 0-.708-.708L8 13.293 4.354 9.646a.5.5 0 1 0-.708.708l4 4a.5.5 0 0 0 .708 0l4-4z"/> <path fill-rule="evenodd" d="M8 1a.5.5 0 0 1 .5.5v11.793l3.146-3.147a.5.5 0 0 1 .708.708l-4 4a.5.5 0 0 1-.708 0l-4-4a.5.5 0 0 1 .708-.708L7.5 13.293V1.5A.5.5 0 0 1 8 1z"/> </svg>
-                            <span class="hidden sm:inline">記録</span>
+                            <span class="hidden sm:inline">記録</span> {# 小画面では非表示 #}
                         </a>
+                        {# 編集リンク #}
                         <a href="{% url 'withham:hamster_edit' hamster.pk %}" class="text-blue-600 hover:text-blue-800 font-medium" title="編集">
                             <svg xmlns="http://www.w3.org/2000/svg" width="1.1em" height="1.1em" fill="currentColor" class="inline-block" viewBox="0 0 16 16"> <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/> <path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/> </svg>
                             <span class="hidden sm:inline">編集</span>
                         </a>
+                        {# 削除リンク #}
                         <a href="{% url 'withham:hamster_delete' hamster.pk %}" class="text-red-600 hover:text-red-800 font-medium" title="削除">
                              <svg xmlns="http://www.w3.org/2000/svg" width="1.1em" height="1.1em" fill="currentColor" class="inline-block" viewBox="0 0 16 16"> <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/> <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/> </svg>
                              <span class="hidden sm:inline">削除</span>
@@ -102,7 +111,7 @@
             {% empty %}
                 <div class="col-span-full text-center text-gray-500 py-4">
                     <p>まだハムスターが登録されていません。</p>
-                    {% if request.user == profile_user %}
+                    {% if request.user == target_user %} {# 変数名を target_user に変更 #}
                          <a href="{% url 'withham:hamster_create' %}" class="mt-2 inline-block bg-green-100 hover:bg-green-200 text-green-800 font-semibold py-1 px-3 rounded-full text-xs">ハムスターを登録する</a>
                     {% endif %}
                 </div>
@@ -113,8 +122,8 @@
 
     {# --- 投稿一覧表示エリア --- #}
     <h3 class="text-xl font-bold text-[#1c140d] mb-4">投稿一覧</h3>
-    {% for post in posts %}
-        {# ... (投稿一覧のループ部分は変更なし) ... #}
+
+    {% for post in posts %} {# ビューから渡された 'posts' リストをループ #}
         <div class="bg-white rounded-xl shadow-sm mb-4 border border-gray-200">
             <div class="p-4">
                 <div class="flex justify-between items-center mb-3">
@@ -123,21 +132,34 @@
                             {% if post.hamster %}
                                  <span class="inline-block bg-[#e0f2fe] text-[#0ea5e9] text-xs font-medium px-2 py-0.5 rounded-full">🐹 {{ post.hamster.name }}</span>
                             {% endif %}
-                            <p class="text-[#9c7349] text-sm font-normal leading-normal {% if post.hamster %}mt-1{% endif %}">{{ post.created_at|timesince }}前</p>
+                            {# 投稿日時を詳細ページへのリンクにする #}
+                            <a href="{% url 'withham:post_detail' post.pk %}" class="block text-[#9c7349] text-sm font-normal leading-normal hover:underline {% if post.hamster %}mt-1{% endif %}">{{ post.created_at|timesince }}前</a>
                         </div>
                     </div>
-                     <button class="ml-auto text-gray-500 hover:text-gray-700">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256"><path d="M144,128a16,16,0,1,1-16-16A16,16,0,0,1,144,128ZM128,64a16,16,0,1,0-16-16A16,16,0,0,0,128,64Zm0,128a16,16,0,1,0,16,16A16,16,0,0,0,128,192Z"></path></svg>
-                     </button>
+                     {# オプションメニュー (投稿者のみ表示) #}
+                     {% if request.user == post.author %}
+                     <div x-data="{ open: false }" class="ml-auto relative">
+                         <button @click="open = !open" class="text-gray-500 hover:text-gray-700 focus:outline-none">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256"><path d="M144,128a16,16,0,1,1-16-16A16,16,0,0,1,144,128ZM128,64a16,16,0,1,0-16-16A16,16,0,0,0,128,64Zm0,128a16,16,0,1,0,16,16A16,16,0,0,0,128,192Z"></path></svg>
+                         </button>
+                         <div x-show="open" @click.away="open = false" x-cloak
+                              class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-100"
+                              x-transition:enter="transition ease-out duration-100" x-transition:enter-start="transform opacity-0 scale-95" x-transition:enter-end="transform opacity-100 scale-100"
+                              x-transition:leave="transition ease-in duration-75" x-transition:leave-start="transform opacity-100 scale-100" x-transition:leave-end="transform opacity-0 scale-95"
+                              style="display: none;">
+                             <a href="{% url 'withham:post_edit' post.pk %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">編集</a>
+                             <a href="{% url 'withham:post_delete' post.pk %}" class="block px-4 py-2 text-sm text-red-600 hover:bg-red-50">削除</a>
+                         </div>
+                     </div>
+                     {% endif %}
                 </div>
-                <a href="{% url 'withham:post_detail' post.pk %}" class="block text-inherit hover:opacity-90">
-                    {% if post.text %}
-                        <p class="text-[#1c140d] text-base leading-relaxed my-3">{{ post.text|linebreaksbr }}</p>
-                    {% endif %}
-                </a>
+                {# 投稿本文 (リンク解除済み) #}
+                {% if post.text %}
+                    <p class="text-[#1c140d] text-base leading-relaxed my-3">{{ post.text|linkify_hashtags|linebreaksbr }}</p>
+                {% endif %}
+                {# 投稿画像 (モーダル表示トリガー付き & 詳細ページへのリンク解除済み) #}
                 {% if post.image %}
-                    <div class="my-3 cursor-pointer open-modal-trigger"
-                         data-full-src="{{ post.image.url }}">
+                    <div class="my-3 cursor-pointer open-modal-trigger" data-full-src="{{ post.image.url }}">
                         <div class="aspect-video w-full overflow-hidden rounded-lg bg-gray-100">
                             <img src="{{ post.image.url }}"
                                  class="w-full h-full object-cover"
@@ -145,6 +167,7 @@
                         </div>
                     </div>
                 {% endif %}
+                {# アクションボタン #}
                 <div class="flex items-center gap-4 text-[#9c7349] pt-3 border-t border-gray-100">
                      <a href="{% url 'withham:post_detail' post.pk %}#comment-form" class="flex items-center gap-1 hover:text-[#1c140d]">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256"><path d="M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-6.54-.67L40,216,52.47,178.6a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z"></path></svg>
@@ -186,5 +209,8 @@
             <span class="block sm:inline">まだ投稿がありません。</span>
         </div>
     {% endfor %}
+
+    {# Alpine.js 読み込み (base.htmlで読み込むので通常は不要) #}
+    {# <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script> #}
 
 {% endblock %} {# contentブロックの終了 #}

@@ -69,10 +69,13 @@ notification_patterns = [
 hashtag_patterns = [
     path('tags/<str:tag_name>/', views.hashtag_search, name='hashtag_search'),
 ]
-
+# ★★★ コメント削除用のURLパターンを追加 ★★★
+comment_patterns = [
+    path('comment/<int:pk>/delete/', views.comment_delete, name='comment_delete'),
+]
 # すべてのURLパターンを結合 (トップページ '/' は独立させる)
 urlpatterns = [
     path('', views.index, name='index'), # トップページ
-] + auth_patterns + post_patterns + profile_patterns + hamster_patterns + health_log_patterns + follow_patterns + search_patterns + notification_patterns + hashtag_patterns
+] + auth_patterns + post_patterns + profile_patterns + hamster_patterns + health_log_patterns + follow_patterns + search_patterns + notification_patterns + hashtag_patterns + comment_patterns
 # post_edit_patterns は post_patterns に統合済み
 

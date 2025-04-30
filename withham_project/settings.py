@@ -38,10 +38,10 @@ if not SECRET_KEY:
     print("Warning: SECRET_KEY environment variable not set, using default (unsafe).")
 # SECURITY WARNING: don't run with debug turned on in production!
 # 開発中はTrue、本番環境ではFalseにします
-DEBUG = os.environ.get('DEBUG', 'True') != 'False'
+DEBUG = True
 
 # 開発中は空でOK、本番環境では許可するホスト名（ドメイン名）を設定します
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
@@ -103,19 +103,13 @@ WSGI_APPLICATION = 'withham_project.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/stable/ref/settings/#databases
 # データベース設定：開発初期はSQLiteで十分です
-DATABASES = {} # まず空の辞書として初期化
-
-# 環境変数 'DATABASE_URL' が設定されているか確認
-if 'DATABASE_URL' in os.environ:
-    # 環境変数があれば、それを使って設定 (Renderなどデプロイ環境向け)
-    DATABASES['default'] = dj_database_url.config(conn_max_age=600)
-else:
-    # 環境変数がなければ、開発用のSQLite設定を使用
-    print("DATABASE_URL environment variable not found. Using SQLite.") # 確認用メッセージ(任意)
-    DATABASES['default'] = {
+# settings.py の DATABASES 設定部分 (ローカル開発用に戻す)
+DATABASES = {
+    'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
     }
+}
 
 
 # Password validation
@@ -149,11 +143,7 @@ USE_I18N = True # 国際化対応を有効にするか
 USE_TZ = True # タイムゾーンを有効にするか
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/stable/howto/static-files/
-# 静的ファイル（CSS, JavaScriptなど）の設定
-STATIC_URL = 'static/'
-# STATICFILES_DIRS = [ BASE_DIR / 'static' ] # プロジェクト直下にstaticディレクトリを作る場合
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/stable/ref/settings/#default-auto-field
@@ -176,12 +166,28 @@ LOGIN_REDIRECT_URL = '/' # トップページにリダイレクトする場合
 
 # --- メディアファイル設定 ---
 # アップロードされたファイルを提供するURL (末尾のスラッシュが重要)
-MEDIA_URL = '/media/'
-
 # アップロードされたファイルを実際に保存するサーバー上のディレクトリパス
 # BASE_DIR は settings.py の上部で定義されているはず
+MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+# アップロードされたファイルを実際に保存するサーバー上のディレクトリパス
+# BASE_DIR は settings.py の上部で定義されているはず
+
+
+STATIC_URL = 'static/'
+
 # または import os して os.path.join(BASE_DIR, 'media') でも可
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-STORAGES = { "staticfiles": { "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage" } }
+STORAGES = {
+    # ↓↓↓ デフォルトファイルストレージの設定を追加 ↓↓↓
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    # ↑↑↑ ここまで追加 ↑↑↑
+
+    # 静的ファイル用ストレージ (whitenoise)
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
