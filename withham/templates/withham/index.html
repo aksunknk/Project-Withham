@@ -1,4 +1,4 @@
-{# withham/templates/withham/index.html (アクションボタン再確認) #}
+{# withham/templates/withham/index.html (最新版) #}
 
 {% extends "withham/base.html" %} {# Tailwind適用済みのbase.htmlを継承 #}
 {% load static %}
@@ -17,7 +17,7 @@
                 {# --- 投稿ヘッダー --- #}
                 <div class="flex justify-between items-center mb-3">
                    <div class="flex items-center gap-3">
-                        {# プロフィールアイコン #}
+                        {# プロフィールアイコン (詳細ページへのリンク) #}
                         <a href="{% url 'withham:profile_detail' post.author.pk %}">
                             {% if post.author.profile.avatar %}
                             <img src="{{ post.author.profile.avatar.url }}" class="h-12 w-12 rounded-full object-cover" alt="{{ post.author.username }}">
@@ -26,7 +26,7 @@
                             {% endif %}
                         </a>
                         <div>
-                            {# 投稿者名 #}
+                            {# 投稿者名 (詳細ページへのリンク) #}
                             <a href="{% url 'withham:profile_detail' post.author.pk %}" class="text-[#1c140d] text-base font-medium leading-normal hover:underline">@{{ post.author.username }}</a>
                             {% if post.hamster %}
                                  <span class="ml-2 inline-block bg-[#e0f2fe] text-[#0ea5e9] text-xs font-medium px-2 py-0.5 rounded-full">🐹 {{ post.hamster.name }}</span>
@@ -70,7 +70,7 @@
                 {% endif %}
 
 
-                {# ★★★ アクションボタン表示エリア ★★★ #}
+                {# --- アクションボタン --- #}
                 <div class="flex items-center gap-4 text-[#9c7349] pt-3 border-t border-gray-100">
                     {# コメントボタン (詳細ページのコメントフォームへ) #}
                      <a href="{% url 'withham:post_detail' post.pk %}#comment-form" class="flex items-center gap-1 hover:text-[#1c140d]">
@@ -79,26 +79,20 @@
                     </a>
 
                     {# いいねボタン #}
-                    {% if user.is_authenticated %}
-                    <button type="button"
-                            class="like-button flex items-center gap-1 {% if user in post.likes.all %}text-[#f2800d]{% else %}text-[#9c7349] hover:text-[#f2800d]{% endif %}"
-                            data-post-id="{{ post.pk }}"
-                            data-like-url="{% url 'withham:toggle_like' post.pk %}">
-                        <svg class="like-icon" xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256">
-                            {% if user in post.likes.all %}
+                    <div class="flex items-center space-x-4">
+                        <button class="like-button flex items-center space-x-1 {% if user.is_authenticated and post in user.liked_posts.all %}text-[#f2800d]{% else %}text-[#9c7349]{% endif %}"
+                                data-post-id="{{ post.id }}"
+                                data-like-url="{% url 'withham:toggle_like' post.id %}">
+                            <svg class="like-icon w-6 h-6" viewBox="0 0 256 256" fill="currentColor">
+                                {% if user.is_authenticated and post in user.liked_posts.all %}
                                 <path d="M128,216S24,160,24,94A54,54,0,0,1,78,40c22.59,0,41.94,12.31,50,32,8.06-19.69,27.41-32,50-32a54,54,0,0,1,54,54C232,160,128,216,128,216Z"></path>
-                            {% else %}
+                                {% else %}
                                 <path d="M178,32c-20.65,0-38.73,8.88-50,23.89C116.73,40.88,98.65,32,78,32A62.07,62.07,0,0,0,16,94c0,70,103.79,126.66,108.21,129a8,8,0,0,0,7.58,0C136.21,220.66,240,164,240,94A62.07,62.07,0,0,0,178,32ZM128,206.8C109.74,196.16,32,147.69,32,94A46.06,46.06,0,0,1,78,48c19.45,0,35.78,10.36,42.6,27a8,8,0,0,0,14.8,0c6.82-16.67,23.15-27,42.6-27a46.06,46.06,0,0,1,46,46C224,147.61,146.24,196.15,128,206.8Z"></path>
-                            {% endif %}
-                        </svg>
-                        <span class="like-count text-xs font-medium">{{ post.likes.count }}</span>
-                    </button>
-                    {% else %}
-                        <span class="flex items-center gap-1 text-[#9c7349]">
-                             <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256"><path d="M178,32c-20.65,0-38.73,8.88-50,23.89C116.73,40.88,98.65,32,78,32A62.07,62.07,0,0,0,16,94c0,70,103.79,126.66,108.21,129a8,8,0,0,0,7.58,0C136.21,220.66,240,164,240,94A62.07,62.07,0,0,0,178,32ZM128,206.8C109.74,196.16,32,147.69,32,94A46.06,46.06,0,0,1,78,48c19.45,0,35.78,10.36,42.6,27a8,8,0,0,0,14.8,0c6.82-16.67,23.15-27,42.6-27a46.06,46.06,0,0,1,46,46C224,147.61,146.24,196.15,128,206.8Z"></path></svg>
-                            <span class="like-count text-xs font-medium">{{ post.likes.count }}</span>
-                        </span>
-                    {% endif %}
+                                {% endif %}
+                            </svg>
+                            <span class="like-count">{{ post.likes_count }}</span>
+                        </button>
+                    </div>
 
                     {# シェアボタン #}
                     <button type="button" class="flex items-center gap-1 hover:text-[#1c140d]">
@@ -109,7 +103,7 @@
                     <button type="button" class="ml-auto hover:text-[#1c140d]">
                          <svg xmlns="http://www.w3.org/2000/svg" width="22px" height="22px" fill="currentColor" viewBox="0 0 256 256"><path d="M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.76,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32Zm0,177.57l-51.76-32.35a8,8,0,0,0-8.48,0L72,209.57V48H184Z"></path></svg>
                     </button>
-                </div>{# ★★★ アクションボタン表示エリアここまで ★★★ #}
+                </div>
             </div>
         </div>
     {% empty %}

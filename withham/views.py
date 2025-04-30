@@ -161,14 +161,14 @@ def toggle_like(request, post_id):
     try:
         post = get_object_or_404(Post, id=post_id)
         user = request.user
-        liked = False
+        is_liked = False
 
         if post.likes.filter(id=user.id).exists():
             post.likes.remove(user)
-            liked = False
+            is_liked = False
         else:
             post.likes.add(user)
-            liked = True
+            is_liked = True
             if post.author != user:
                 Notification.objects.create(
                     recipient=post.author,
@@ -177,7 +177,7 @@ def toggle_like(request, post_id):
                     target=post
                 )
         likes_count = post.likes.count()
-        return JsonResponse({'liked': liked, 'likes_count': likes_count})
+        return JsonResponse({'is_liked': is_liked, 'likes_count': likes_count})
     except Exception as e:
         print(f"Error in toggle_like: {e}")
         return JsonResponse({'error': str(e)}, status=400)
