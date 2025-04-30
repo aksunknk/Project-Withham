@@ -80,8 +80,12 @@ npm run build:css
 ```bash
 python manage.py runserver
 ```
+### デプロイメント
+ テストデプロイはrenderを使用
+ ブランチ切り分け後にデプロイ方法を追記予定(5/1)
+
 <!-- 
-## デプロイメント\
+
 
  Herokuへのデプロイ\
  1. Heroku CLIをインストール\
