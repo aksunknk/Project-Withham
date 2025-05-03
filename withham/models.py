@@ -73,7 +73,8 @@ class Post(models.Model):
     created_at = models.DateTimeField('投稿日時', default=timezone.now)
     likes = models.ManyToManyField(User, related_name='liked_posts', blank=True, verbose_name='いいねしたユーザー')
     tags = models.ManyToManyField(Tag, blank=True, related_name='posts', verbose_name='タグ')
-
+    post_as_hamster = models.BooleanField("ハムスターとして投稿", default=False)
+    
     def __str__(self):
         return f'Post by {self.author.username} at {self.created_at.strftime("%Y-%m-%d %H:%M")}'
 

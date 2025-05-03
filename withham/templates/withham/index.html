@@ -1,4 +1,4 @@
-{# withham/templates/withham/index.html (最新版) #}
+{# withham/templates/withham/index.html (ハムスター投稿表示対応) #}
 
 {% extends "withham/base.html" %} {# Tailwind適用済みのbase.htmlを継承 #}
 {% load static %}
@@ -12,28 +12,55 @@
 
     {# --- 投稿一覧ループ --- #}
     {% for post in posts %}
-        <div class="bg-white rounded-xl shadow-sm mb-4 border border-gray-200">
+        {# ▼▼▼ ハムスター投稿の場合に背景色と枠線を変える ▼▼▼ #}
+        <div class="rounded-xl shadow-sm mb-4 border
+                    {% if post.post_as_hamster and post.hamster %}
+                        bg-yellow-50 border-yellow-200 {# ハムスター投稿用のスタイル #}
+                    {% else %}
+                        bg-white border-gray-200 {# 通常投稿用のスタイル #}
+                    {% endif %}">
             <div class="p-4"> {# 内側のパディング #}
                 {# --- 投稿ヘッダー --- #}
                 <div class="flex justify-between items-center mb-3">
                    <div class="flex items-center gap-3">
-                        {# プロフィールアイコン (詳細ページへのリンク) #}
-                        <a href="{% url 'withham:profile_detail' post.author.pk %}">
-                            {% if post.author.profile.avatar %}
-                            <img src="{{ post.author.profile.avatar.url }}" class="h-12 w-12 rounded-full object-cover" alt="{{ post.author.username }}">
-                            {% else %}
-                            <img src="{% static 'images/default_avatar.png' %}" class="h-12 w-12 rounded-full bg-gray-200 object-cover" alt="デフォルトアバター">
-                            {% endif %}
-                        </a>
-                        <div>
-                            {# 投稿者名 (詳細ページへのリンク) #}
-                            <a href="{% url 'withham:profile_detail' post.author.pk %}" class="text-[#1c140d] text-base font-medium leading-normal hover:underline">@{{ post.author.username }}</a>
-                            {% if post.hamster %}
-                                 <span class="ml-2 inline-block bg-[#e0f2fe] text-[#0ea5e9] text-xs font-medium px-2 py-0.5 rounded-full">🐹 {{ post.hamster.name }}</span>
-                            {% endif %}
-                            {# 投稿日時 (詳細ページへのリンク) #}
-                            <a href="{% url 'withham:post_detail' post.pk %}" class="block text-[#9c7349] text-sm font-normal leading-normal hover:underline">{{ post.created_at|timesince }}前</a>
-                        </div>
+                        {# ▼▼▼ ハムスター投稿か飼い主投稿かで表示を切り替え ▼▼▼ #}
+                        {% if post.post_as_hamster and post.hamster %}
+                            {# ハムスターとして投稿の場合 #}
+                            <a href="#"> {# ハムスター詳細ページへのリンク (仮) #}
+                                {% if post.hamster.profile_image %}
+                                <img src="{{ post.hamster.profile_image.url }}" class="h-12 w-12 rounded-full object-cover border-2 border-white shadow-sm" alt="{{ post.hamster.name }}">
+                                {% else %}
+                                <img src="{% static 'images/default_hamster_icon.svg' %}" class="h-12 w-12 rounded-full bg-gray-100 object-contain p-1 border border-gray-200" alt="デフォルトハムスターアイコン">
+                                {% endif %}
+                            </a>
+                            <div>
+                                {# ハムスター名 #}
+                                <a href="#" class="text-[#1c140d] text-base font-semibold leading-normal hover:underline">{{ post.hamster.name }}</a>
+                                {# 飼い主情報（小さく表示） #}
+                                <p class="text-xs text-gray-500">
+                                    （飼い主: <a href="{% url 'withham:profile_detail' post.author.pk %}" class="hover:underline">@{{ post.author.username }}</a>）
+                                </p>
+                                {# 投稿日時 #}
+                                <a href="{% url 'withham:post_detail' post.pk %}" class="block text-[#9c7349] text-sm font-normal leading-normal hover:underline">{{ post.created_at|timesince }}前</a>
+                            </div>
+                        {% else %}
+                            {# 飼い主として投稿の場合 (従来通り) #}
+                            <a href="{% url 'withham:profile_detail' post.author.pk %}">
+                                {% if post.author.profile.avatar %}
+                                <img src="{{ post.author.profile.avatar.url }}" class="h-12 w-12 rounded-full object-cover" alt="{{ post.author.username }}">
+                                {% else %}
+                                <img src="{% static 'images/default_avatar.png' %}" class="h-12 w-12 rounded-full bg-gray-200 object-cover" alt="デフォルトアバター">
+                                {% endif %}
+                            </a>
+                            <div>
+                                <a href="{% url 'withham:profile_detail' post.author.pk %}" class="text-[#1c140d] text-base font-medium leading-normal hover:underline">@{{ post.author.username }}</a>
+                                {% if post.hamster %}
+                                     <span class="ml-2 inline-block bg-[#e0f2fe] text-[#0ea5e9] text-xs font-medium px-2 py-0.5 rounded-full">🐹 {{ post.hamster.name }}</span>
+                                {% endif %}
+                                <a href="{% url 'withham:post_detail' post.pk %}" class="block text-[#9c7349] text-sm font-normal leading-normal hover:underline">{{ post.created_at|timesince }}前</a>
+                            </div>
+                        {% endif %}
+                        {# ▲▲▲ 表示切り替えここまで ▲▲▲ #}
                     </div>
                      {# オプションメニュー (投稿者のみ表示) #}
                      {% if request.user == post.author %}
@@ -79,19 +106,27 @@
                     </a>
 
                     {# いいねボタン #}
-                    <div class="flex items-center space-x-4">
-                        <button class="like-button flex items-center space-x-1 {% if user.is_authenticated and post in user.liked_posts.all %}text-[#f2800d]{% else %}text-[#9c7349]{% endif %}"
-                                data-post-id="{{ post.id }}"
-                                data-like-url="{% url 'withham:toggle_like' post.id %}">
-                            <svg class="like-icon w-6 h-6" viewBox="0 0 256 256" fill="currentColor">
-                                {% if user.is_authenticated and post in user.liked_posts.all %}
+                    <div class="flex items-center space-x-4"> {# このdivは不要かもしれない #}
+                        {% if user.is_authenticated %}
+                        <button type="button"
+                                class="like-button flex items-center gap-1 {% if user in post.likes.all %}text-[#f2800d]{% else %}text-[#9c7349] hover:text-[#f2800d]{% endif %}"
+                                data-post-id="{{ post.pk }}"
+                                data-like-url="{% url 'withham:toggle_like' post.pk %}">
+                            <svg class="like-icon w-6 h-6" viewBox="0 0 256 256" fill="currentColor"> {# サイズ調整 w-6 h-6 #}
+                                {% if user in post.likes.all %}
                                 <path d="M128,216S24,160,24,94A54,54,0,0,1,78,40c22.59,0,41.94,12.31,50,32,8.06-19.69,27.41-32,50-32a54,54,0,0,1,54,54C232,160,128,216,128,216Z"></path>
                                 {% else %}
                                 <path d="M178,32c-20.65,0-38.73,8.88-50,23.89C116.73,40.88,98.65,32,78,32A62.07,62.07,0,0,0,16,94c0,70,103.79,126.66,108.21,129a8,8,0,0,0,7.58,0C136.21,220.66,240,164,240,94A62.07,62.07,0,0,0,178,32ZM128,206.8C109.74,196.16,32,147.69,32,94A46.06,46.06,0,0,1,78,48c19.45,0,35.78,10.36,42.6,27a8,8,0,0,0,14.8,0c6.82-16.67,23.15-27,42.6-27a46.06,46.06,0,0,1,46,46C224,147.61,146.24,196.15,128,206.8Z"></path>
                                 {% endif %}
                             </svg>
-                            <span class="like-count">{{ post.likes_count }}</span>
+                            <span class="like-count text-xs font-medium">{{ post.likes.count }}</span>
                         </button>
+                        {% else %}
+                            <span class="flex items-center gap-1 text-[#9c7349]">
+                                 <svg class="w-6 h-6" viewBox="0 0 256 256" fill="currentColor">...</svg>
+                                <span class="like-count text-xs font-medium">{{ post.likes.count }}</span>
+                            </span>
+                        {% endif %}
                     </div>
 
                     {# シェアボタン #}
