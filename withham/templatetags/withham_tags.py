@@ -36,3 +36,17 @@ def linkify_hashtags(value):
     # HTMLタグを安全なものとしてマークして返す
     return mark_safe(linked_text)
 
+@register.filter
+def hashtag_links(text):
+    # ハッシュタグのパターン（日本語も含む）
+    pattern = r'#([\w\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]+)'
+    
+    # ハッシュタグをリンクに変換
+    def replace_hashtag(match):
+        hashtag = match.group(1)
+        return f'<a href="/search/?q=%23{hashtag}" class="text-[#f2800d] hover:underline">#{hashtag}</a>'
+    
+    # テキスト内のハッシュタグを置換
+    result = re.sub(pattern, replace_hashtag, text)
+    return mark_safe(result)
+

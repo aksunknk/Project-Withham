@@ -8,6 +8,8 @@ from django.contrib.auth.models import User # Userモデルもインポート
 from .models import Post, Hamster, UserProfile, Comment, HealthLog, Tag # Tagもインポート
 # ↓↓↓ forms.ValidationError をインポート ↓↓↓
 from django.core.exceptions import ValidationError
+from .models import Post, Hamster, UserProfile, Comment, HealthLog, Tag, Notification, Question, Answer
+from django.core.exceptions import ValidationError
 
 
 # ★★★ PostForm を修正 ★★★
@@ -138,3 +140,44 @@ class SignUpForm(UserCreationForm):
         model = User
         fields = ('username', 'email')
 
+# ★★★ QuestionForm を追加 ★★★
+class QuestionForm(forms.ModelForm):
+    """質問投稿フォーム"""
+    class Meta:
+        model = Question
+        # ユーザーが入力するフィールドを指定 (authorはビューで設定)
+        fields = ['title', 'text'] # 必要なら 'hamster' や 'tags' も追加
+        labels = {
+            'title': '質問のタイトル',
+            'text': '質問の内容（困っていること、知りたいことなど）',
+        }
+        widgets = {
+            'title': forms.TextInput(attrs={
+                'placeholder': '例: ケージの掃除頻度は？',
+                'class': 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#f2800d] focus:ring focus:ring-[#f2800d] focus:ring-opacity-50' # Tailwindクラス
+            }),
+            'text': forms.Textarea(attrs={
+                'rows': 6,
+                'placeholder': '具体的な状況や、試したことなども書くと回答が集まりやすいです。',
+                'class': 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#f2800d] focus:ring focus:ring-[#f2800d] focus:ring-opacity-50' # Tailwindクラス
+            }),
+        }
+
+
+# ★★★ AnswerForm を追加 ★★★
+class AnswerForm(forms.ModelForm):
+    """回答投稿フォーム"""
+    class Meta:
+        model = Answer
+        # ユーザーが入力するのは回答内容のみ (question, authorはビューで設定)
+        fields = ['text']
+        labels = {
+            'text': '', # ラベルは非表示にする想定
+        }
+        widgets = {
+            'text': forms.Textarea(attrs={
+                'rows': 3, # 少し小さめのテキストエリア
+                'placeholder': '回答を入力...',
+                'class': 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#f2800d] focus:ring focus:ring-[#f2800d] focus:ring-opacity-50' # Tailwindクラス
+            })
+        }

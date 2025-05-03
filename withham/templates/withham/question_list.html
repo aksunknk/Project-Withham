@@ -1,0 +1,68 @@
+{# withham/templates/withham/question_list.html (block title修正) #}
+
+{% extends "withham/base.html" %}
+{% load static %}
+{% load humanize %}
+
+{# ▼▼▼ block title はここに1回だけ定義 ▼▼▼ #}
+{% block title %}質問一覧 - withham{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold text-[#1c140d]">質問一覧</h1>
+        {% if user.is_authenticated %}
+        <a href="{% url 'withham:question_create' %}" class="bg-[#f2800d] text-white px-4 py-2 rounded-lg hover:bg-[#e67300]">
+            質問を投稿
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="space-y-6">
+        {% for question in questions %}
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <div class="flex items-center gap-4 mb-4">
+                <a href="{% url 'withham:profile_detail' question.user.pk %}" class="flex items-center gap-2">
+                    {% if question.user.profile.avatar %}
+                        <img src="{{ question.user.profile.avatar.url }}" alt="{{ question.user.username }}" class="w-10 h-10 rounded-full object-cover">
+                    {% else %}
+                        <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                            <svg class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path>
+                            </svg>
+                        </div>
+                    {% endif %}
+                    <span class="font-medium text-[#1c140d]">{{ question.user.username }}</span>
+                </a>
+                <span class="text-sm text-gray-500">{{ question.created_at|date:"Y/m/d H:i" }}</span>
+            </div>
+
+            <a href="{% url 'withham:question_detail' question.pk %}" class="block">
+                <h2 class="text-xl font-bold text-[#1c140d] mb-2 hover:text-[#f2800d]">{{ question.title }}</h2>
+                <p class="text-gray-700 line-clamp-3">{{ question.text }}</p>
+            </a>
+
+            <div class="flex items-center gap-4 mt-4">
+                <span class="text-sm text-gray-500">
+                    回答 {{ question.answers.count }}件
+                </span>
+                {% if question.is_resolved %}
+                <span class="text-sm text-green-600 bg-green-100 px-2 py-1 rounded">
+                    解決済み
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="text-center py-12">
+            <p class="text-gray-500">まだ質問はありません。</p>
+            {% if user.is_authenticated %}
+            <a href="{% url 'withham:question_create' %}" class="text-[#f2800d] hover:text-[#e67300] mt-4 inline-block">
+                最初の質問を投稿する
+            </a>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

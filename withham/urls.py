@@ -73,9 +73,17 @@ hashtag_patterns = [
 comment_patterns = [
     path('comment/<int:pk>/delete/', views.comment_delete, name='comment_delete'),
 ]
+# ★★★ Q&A関連のURLパターンを追加 ★★★
+qa_patterns = [
+    path('questions/', views.question_list, name='question_list'),             # 質問一覧
+    path('questions/new/', views.question_create, name='question_create'),   # 新規質問作成
+    path('questions/<int:pk>/', views.question_detail, name='question_detail'), # 質問詳細・回答
+]
+
+
 # すべてのURLパターンを結合 (トップページ '/' は独立させる)
 urlpatterns = [
     path('', views.index, name='index'), # トップページ
-] + auth_patterns + post_patterns + profile_patterns + hamster_patterns + health_log_patterns + follow_patterns + search_patterns + notification_patterns + hashtag_patterns + comment_patterns
+] + auth_patterns + post_patterns + profile_patterns + hamster_patterns + health_log_patterns + follow_patterns + search_patterns + notification_patterns + hashtag_patterns + comment_patterns + qa_patterns
 # post_edit_patterns は post_patterns に統合済み
 

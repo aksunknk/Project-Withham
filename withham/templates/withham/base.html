@@ -1,4 +1,4 @@
-{# withham/templates/withham/base.html (最新版) #}
+{# withham/templates/withham/base.html (JSシンプル化・修正) #}
 {% load static %}
 <!DOCTYPE html>
 <html lang="ja">
@@ -7,8 +7,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}withham{% endblock %}</title>
 
-    {# Faviconの設定 #}
-    <link rel="icon" type="image/svg+xml" href="{% static 'withham/favicon.svg' %}">
+    {# Faviconの設定 (パスを確認してください) #}
+    {# <link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}"> #}
 
     {# Google Fonts 読み込み #}
     <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="" />
@@ -19,161 +19,167 @@
       href="https://fonts.googleapis.com/css2?display=swap&amp;family=Noto+Sans%3Awght%40400%3B500%3B700%3B900&amp;family=Plus+Jakarta+Sans%3Awght%40400%3B500%3B700%3B800"
     />
 
-    {# Tailwind CSS 本番環境用 #}
-    {% if debug %}
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    {% else %}
-    <link href="{% static 'withham/css/tailwind.min.css' %}" rel="stylesheet">
-    {% endif %}
+    {# ローカルでビルドしたCSSファイルを読み込む #}
+    <link href="{% static 'withham/css/output.css' %}" rel="stylesheet"> {# パスを確認 #}
 
     {# (任意) Alpine.jsのちらつき防止用スタイル #}
     <style>[x-cloak] { display: none !important; }</style>
 
-    {# リンクの動作を制御するスタイル #}
-    <style>
-        /* デスクトップサイズでのリンク動作を制御 */
-        @media (min-width: 1024px) {
-            aside a,
-            .bottom-nav a,
-            main a:not(.like-button):not(.comment-button) {
-                pointer-events: auto;
-            }
-        }
-    </style>
-
     {# 各ページで追加の<head>要素を挿入するためのブロック #}
     {% block extra_head %}{% endblock %}
 </head>
-<body class="bg-[#f4ede7]"> {# 背景色をbodyに設定 #}
+<body class="bg-[#f4ede7]">
     {# 全体を囲むコンテナ #}
     <div class="relative flex min-h-screen flex-col" style='font-family: "Plus Jakarta Sans", "Noto Sans", sans-serif;'>
-
-        {# メインレイアウトコンテナ (レスポンシブ対応) #}
+        {# メインレイアウトコンテナ (lg以上でGrid) #}
         <div class="w-full max-w-screen-xl mx-auto px-4 sm:px-6 py-5 lg:grid lg:grid-cols-[theme(space.80)_minmax(0,_1fr)] lg:gap-6 flex-1">
 
             {# --- 左サイドバー (lg以上の画面で表示) --- #}
             <aside class="hidden lg:block h-screen sticky top-5">
-                <div class="flex h-full flex-col justify-between bg-[#fcfaf8] p-4 rounded-xl shadow-sm border border-gray-200">
+                <div class="flex h-full flex-col justify-between bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                     <div class="flex flex-col gap-4">
-                        {# サイトロゴやタイトル #}
                         <div class="p-3 text-center">
-                            <a href="{% url 'withham:index' %}" class="text-2xl font-bold text-[#1c140d] hover:text-[#f2800d] transition-colors">withham</a>
+                            <a href="{% url 'withham:index' %}" class="text-2xl font-bold text-[#1c140d] hover:text-[#f2800d]">withham</a>
                         </div>
-                        {# ナビゲーションリンク #}
                         <nav class="flex flex-col gap-1">
-                           {# --- Home Link --- #}
-                           <a href="{% url 'withham:index' %}" class="flex items-center gap-3 px-2 py-1 rounded-full hover:bg-[#f4ede7] text-[#1c140d] transition-colors">
-                               <div class="flex-shrink-0 w-6 h-6">
-                                   <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256"><path d="M224,115.55V208a16,16,0,0,1-16,16H168a16,16,0,0,1-16-16V168a8,8,0,0,0-8-8H112a8,8,0,0,0-8,8v40a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V115.55a16,16,0,0,1,5.17-11.78l80-75.48.11-.11a16,16,0,0,1,21.53,0,1.14,1.14,0,0,0,.11.11l80,75.48A16,16,0,0,1,224,115.55Z"></path></svg>
-                               </div>
-                               <p class="text-sm font-medium leading-normal">Home</p>
-                           </a>
-                           {# --- Explore Link --- #}
-                           <a href="{% url 'withham:search_results' %}" class="flex items-center gap-3 px-2 py-1 rounded-full hover:bg-[#f4ede7] text-[#1c140d] transition-colors">
-                               <div class="flex-shrink-0 w-6 h-6">
-                                   <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216ZM172.42,72.84l-64,32a8.05,8.05,0,0,0-3.58,3.58l-32,64A8,8,0,0,0,80,184a8.1,8.1,0,0,0,3.58-.84l64-32a8.05,8.05,0,0,0,3.58-3.58l32-64a8,8,0,0,0-10.74-10.74ZM138,138,97.89,158.11,118,118l40.15-20.07Z"></path></svg>
-                               </div>
-                               <p class="text-sm font-medium leading-normal">Explore</p>
-                           </a>
-                           {# --- Create Link --- #}
-                           {% if user.is_authenticated %}
-                           <a href="{% url 'withham:post_create' %}" class="flex items-center gap-3 px-2 py-1 rounded-full hover:bg-[#f4ede7] text-[#1c140d] transition-colors">
-                               <div class="flex-shrink-0 w-6 h-6">
-                                   <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"></path></svg>
-                               </div>
-                               <p class="text-sm font-medium leading-normal">Create</p>
-                           </a>
-                           {% endif %}
-                           {# --- Notifications Link --- #}
-                           <a href="{% url 'withham:notification_list' %}" class="flex items-center gap-3 px-2 py-1 rounded-full hover:bg-[#f4ede7] text-[#1c140d] transition-colors">
-                               <div class="flex-shrink-0 w-6 h-6">
-                                   <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256"><path d="M221.8,175.94C216.25,166.38,208,139.33,208,104a80,80,0,1,0-160,0c0,35.34-8.26,62.38-13.81,71.94A16,16,0,0,0,48,200H88.81a40,40,0,0,0,78.38,0H208a16,16,0,0,0,13.8-24.06ZM128,216a24,24,0,0,1-22.62-16h45.24A24,24,0,0,1,128,216ZM48,184c7.7-13.24,16-43.92,16-80a64,64,0,1,1,128,0c0,36.05,8.28,66.73,16,80Z"></path></svg>
-                               </div>
-                               <p class="text-sm font-medium leading-normal">Notifications</p>
-                           </a>
-                           {# --- Profile Link --- #}
-                           {% if user.is_authenticated %}
-                               <a href="{% url 'withham:profile_detail' user.pk %}" class="flex items-center gap-3 px-2 py-1 rounded-full hover:bg-[#f4ede7] text-[#1c140d] transition-colors">
-                                   <div class="flex-shrink-0 w-6 h-6">
-                                       <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256"><path d="M230.92,212c-15.23-26.33-38.7-45.21-66.09-54.16a72,72,0,1,0-73.66,0C63.78,166.78,40.31,185.66,25.08,212a8,8,0,1,0,13.85,8c18.84-32.56,52.14-52,89.07-52s70.23,19.44,89.07,52a8,8,0,1,0,13.85-8ZM72,96a56,56,0,1,1,56,56A56.06,56.06,0,0,1,72,96Z"></path></svg>
-                                   </div>
-                                   <p class="text-sm font-medium leading-normal">Profile</p>
-                               </a>
-                               {# --- Logout Link (Form) --- #}
-                               <form action="{% url 'withham:logout' %}" method="post" class="w-full">
-                                   {% csrf_token %}
-                                   <button type="submit" class="w-full flex items-center gap-3 px-2 py-1 rounded-full hover:bg-[#f4ede7] text-[#1c140d] text-left transition-colors">
-                                        <div class="flex-shrink-0 w-6 h-6">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256"><path d="M112,216a8,8,0,0,1-8,8H48a16,16,0,0,1-16-16V48A16,16,0,0,1,48,32h56a8,8,0,0,1,0,16H48V208h56A8,8,0,0,1,112,216Zm109.66-92.69-56-56a8,8,0,0,0-11.32,11.32L196.69,120H104a8,8,0,0,0,0,16h92.69l-42.35,42.34a8,8,0,0,0,11.32,11.32l56-56A8,8,0,0,0,221.66,123.31Z"></path></svg>
-                                        </div>
-                                        <p class="text-sm font-medium leading-normal">Logout</p>
-                                    </button>
-                               </form>
-                           {% else %}
-                               <a href="{% url 'withham:login' %}" class="flex items-center gap-3 px-2 py-1 rounded-full hover:bg-[#f4ede7] text-[#1c140d] transition-colors">
-                                   <div class="flex-shrink-0 w-6 h-6">
-                                       <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256"><path d="M230.92,212c-15.23-26.33-38.7-45.21-66.09-54.16a72,72,0,1,0-73.66,0C63.78,166.78,40.31,185.66,25.08,212a8,8,0,1,0,13.85,8c18.84-32.56,52.14-52,89.07-52s70.23,19.44,89.07,52a8,8,0,1,0,13.85-8ZM72,96a56,56,0,1,1,56,56A56.06,56.06,0,0,1,72,96Z"></path></svg>
-                                   </div>
-                                   <p class="text-sm font-medium leading-normal">Profile</p>
-                               </a>
-                           {% endif %}
+                            <a href="{% url 'withham:index' %}" class="flex items-center gap-3 px-2 py-1 rounded-full hover:bg-[#f4ede7] text-[#1c140d]">
+                                <div class="flex-shrink-0 w-6 h-6">
+                                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"></path>
+                                    </svg>
+                                </div>
+                                <p>Home</p>
+                            </a>
+                            <a href="{% url 'withham:search_results' %}" class="flex items-center gap-3 px-2 py-1 rounded-full hover:bg-[#f4ede7] text-[#1c140d]">
+                                <div class="flex-shrink-0 w-6 h-6">
+                                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"></path>
+                                    </svg>
+                                </div>
+                                <p>Explore</p>
+                            </a>
+                            {% if user.is_authenticated %}
+                            <a href="{% url 'withham:post_create' %}" class="flex items-center gap-3 px-2 py-1 rounded-full hover:bg-[#f4ede7] text-[#1c140d]">
+                                <div class="flex-shrink-0 w-6 h-6">
+                                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"></path>
+                                    </svg>
+                                </div>
+                                <p>Create</p>
+                            </a>
+                            <a href="{% url 'withham:notification_list' %}" class="flex items-center gap-3 px-2 py-1 rounded-full hover:bg-[#f4ede7] text-[#1c140d]">
+                                <div class="flex-shrink-0 w-6 h-6">
+                                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"></path>
+                                    </svg>
+                                </div>
+                                <p>Notifications</p>
+                            </a>
+                            <a href="{% url 'withham:question_list' %}" class="flex items-center gap-3 px-2 py-1 rounded-full hover:bg-[#f4ede7] text-[#1c140d]">
+                                <div class="flex-shrink-0 w-6 h-6">
+                                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path>
+                                    </svg>
+                                </div>
+                                <p>Q&A</p>
+                            </a>
+                            <a href="{% url 'withham:profile_detail' user.pk %}" class="flex items-center gap-3 px-2 py-1 rounded-full hover:bg-[#f4ede7] text-[#1c140d]">
+                                <div class="flex-shrink-0 w-6 h-6">
+                                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path>
+                                    </svg>
+                                </div>
+                                <p>Profile</p>
+                            </a>
+                            <form action="{% url 'withham:logout' %}" method="post" class="w-full">
+                                {% csrf_token %}
+                                <button type="submit" class="w-full flex items-center gap-3 px-2 py-1 rounded-full hover:bg-[#f4ede7] text-[#1c140d] text-left">
+                                    <div class="flex-shrink-0 w-6 h-6">
+                                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd"></path>
+                                        </svg>
+                                    </div>
+                                    <p>Logout</p>
+                                </button>
+                            </form>
+                            {% else %}
+                            <a href="{% url 'withham:login' %}" class="flex items-center justify-center gap-2 px-4 py-2 mt-auto bg-[#f2800d] text-white rounded-full hover:bg-[#e67300]">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M3 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm7.707 3.293a1 1 0 010 1.414L9.414 9H17a1 1 0 110 2H9.414l1.293 1.293a1 1 0 01-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                                </svg>
+                                <span>Login / Sign up</span>
+                            </a>
+                            {% endif %}
                         </nav>
                     </div>
                     {% if not user.is_authenticated %}
-                        <a href="{% url 'withham:login' %}" class="flex items-center justify-center gap-2 px-4 py-2 mt-auto text-sm font-medium text-white bg-[#f2800d] rounded-full hover:bg-[#e0700d] transition-colors">
-                            <span>Login / Sign up</span>
-                        </a>
+                    <a href="{% url 'withham:login' %}" class="flex items-center justify-center gap-2 px-4 py-2 mt-auto bg-[#f2800d] text-white rounded-full hover:bg-[#e67300]">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M3 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm7.707 3.293a1 1 0 010 1.414L9.414 9H17a1 1 0 110 2H9.414l1.293 1.293a1 1 0 01-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                        </svg>
+                        <span>Login / Sign up</span>
+                    </a>
                     {% endif %}
                 </div>
             </aside>
 
-            {# --- 中央コンテンツエリア (レスポンシブ対応) --- #}
-            <main class="w-full pb-16 sm:pb-20 md:pb-24 lg:pb-0">
+            {# --- 中央コンテンツエリア --- #}
+            <main class="w-full pb-28 lg:pb-0">
                 {% block content %}
                 {% endblock %}
             </main>
 
         </div> {# メインレイアウト終了 #}
 
-        {# --- ボトムナビゲーションバー (レスポンシブ対応) --- #}
-        <nav class="flex lg:hidden fixed bottom-0 left-0 z-40 w-full h-14 sm:h-16 bg-white border-t border-gray-200 justify-around items-center">
-            {# Home Link #}
+        {# --- ボトムナビゲーションバー (lg未満の画面で表示) --- #}
+        <nav class="flex lg:hidden fixed bottom-0 left-0 z-40 w-full h-16 bg-white border-t border-gray-200 justify-around items-center">
             <a href="{% url 'withham:index' %}" class="flex flex-col items-center justify-center w-full h-full text-[#1c140d] hover:text-[#f2800d]">
-                <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 256 256"><path d="M224,115.55V208a16,16,0,0,1-16,16H168a16,16,0,0,1-16-16V168a8,8,0,0,0-8-8H112a8,8,0,0,0-8,8v40a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V115.55a16,16,0,0,1,5.17-11.78l80-75.48.11-.11a16,16,0,0,1,21.53,0,1.14,1.14,0,0,0,.11.11l80,75.48A16,16,0,0,1,224,115.55Z"></path></svg>
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"></path>
+                </svg>
                 <span class="text-xs mt-1">Home</span>
             </a>
-
-            {# Explore Link #}
             <a href="{% url 'withham:search_results' %}" class="flex flex-col items-center justify-center w-full h-full text-[#1c140d] hover:text-[#f2800d]">
-                <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216ZM172.42,72.84l-64,32a8.05,8.05,0,0,0-3.58,3.58l-32,64A8,8,0,0,0,80,184a8.1,8.1,0,0,0,3.58-.84l64-32a8.05,8.05,0,0,0,3.58-3.58l32-64a8,8,0,0,0-10.74-10.74ZM138,138,97.89,158.11,118,118l40.15-20.07Z"></path></svg>
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"></path>
+                </svg>
                 <span class="text-xs mt-1">Explore</span>
             </a>
-
-            {# Create Link (ログイン時のみ表示) #}
             {% if user.is_authenticated %}
-            <a href="{% url 'withham:post_create' %}" class="flex flex-col items-center justify-center w-full h-full text-[#1c140d] hover:text-[#f2800d]">
-                <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"></path></svg>
-                <span class="text-xs mt-1">Create</span>
-            </a>
-            {% endif %}
-
-            {# Notifications Link #}
             <a href="{% url 'withham:notification_list' %}" class="flex flex-col items-center justify-center w-full h-full text-[#1c140d] hover:text-[#f2800d]">
-                <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 256 256"><path d="M221.8,175.94C216.25,166.38,208,139.33,208,104a80,80,0,1,0-160,0c0,35.34-8.26,62.38-13.81,71.94A16,16,0,0,0,48,200H88.81a40,40,0,0,0,78.38,0H208a16,16,0,0,0,13.8-24.06ZM128,216a24,24,0,0,1-22.62-16h45.24A24,24,0,0,1,128,216ZM48,184c7.7-13.24,16-43.92,16-80a64,64,0,1,1,128,0c0,36.05,8.28,66.73,16,80Z"></path></svg>
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"></path>
+                </svg>
                 <span class="text-xs mt-1">Notifications</span>
             </a>
-
-            {# Profile Link #}
-            <a href="{% if user.is_authenticated %}{% url 'withham:profile_detail' user.pk %}{% else %}{% url 'withham:login' %}{% endif %}" class="flex flex-col items-center justify-center w-full h-full text-[#1c140d] hover:text-[#f2800d]">
-                <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 256 256"><path d="M230.92,212c-15.23-26.33-38.7-45.21-66.09-54.16a72,72,0,1,0-73.66,0C63.78,166.78,40.31,185.66,25.08,212a8,8,0,1,0,13.85,8c18.84-32.56,52.14-52,89.07-52s70.23,19.44,89.07,52a8,8,0,1,0,13.85-8ZM72,96a56,56,0,1,1,56,56A56.06,56.06,0,0,1,72,96Z"></path></svg>
+            <a href="{% url 'withham:question_list' %}" class="flex flex-col items-center justify-center w-full h-full text-[#1c140d] hover:text-[#f2800d]">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path>
+                </svg>
+                <span class="text-xs mt-1">Q&A</span>
+            </a>
+            <a href="{% url 'withham:profile_detail' user.pk %}" class="flex flex-col items-center justify-center w-full h-full text-[#1c140d] hover:text-[#f2800d]">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path>
+                </svg>
                 <span class="text-xs mt-1">Profile</span>
             </a>
+            {% else %}
+            <a href="{% url 'withham:login' %}" class="flex flex-col items-center justify-center w-full h-full text-[#1c140d] hover:text-[#f2800d]">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M3 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm7.707 3.293a1 1 0 010 1.414L9.414 9H17a1 1 0 110 2H9.414l1.293 1.293a1 1 0 01-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                </svg>
+                <span class="text-xs mt-1">Login</span>
+            </a>
+            {% endif %}
         </nav>
 
-        {# --- フローティングアクションボタン (レスポンシブ対応) --- #}
+        {# --- フローティングアクションボタン (投稿作成) --- #}
         {% if user.is_authenticated %}
-        <a href="{% url 'withham:post_create' %}" class="lg:hidden fixed bottom-20 sm:bottom-24 right-4 sm:right-6 z-30 bg-[#f2800d] text-white rounded-full p-3 shadow-lg hover:opacity-90 transition-opacity">
-            <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"></path></svg>
+        <a href="{% url 'withham:post_create' %}" class="lg:hidden fixed bottom-20 right-6 z-30 bg-[#f2800d] text-white rounded-full p-3 shadow-lg hover:opacity-90 transition-opacity">
+            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"></path>
+            </svg>
         </a>
         {% endif %}
 
@@ -181,76 +187,71 @@
 
 
     {# --- 画像拡大モーダル用のHTML --- #}
-    <div id="imageModal" class="fixed inset-0 z-50 hidden">
-        <div class="absolute inset-0 bg-black bg-opacity-75 cursor-pointer" id="modalOverlay"></div>
-        <div class="relative flex items-center justify-center w-full h-full pointer-events-none">
-            <div class="relative pointer-events-auto">
-                <img id="modalImage" class="max-w-full max-h-full" src="" alt="拡大画像">
-            </div>
+    <div id="imageModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
+        <div class="relative max-w-3xl max-h-[80vh]">
+            <img id="modalImage" src="" alt="拡大画像" class="block max-w-full max-h-[80vh] rounded-lg shadow-lg">
+            <button id="closeModalButton" class="absolute top-2 right-2 text-white bg-black bg-opacity-50 rounded-full p-1 hover:bg-opacity-75 focus:outline-none">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+                </svg>
+            </button>
         </div>
     </div>
 
     {% block extra_js %}{% endblock %}
 
-    {# --- モーダル制御用 + いいね機能用 JavaScript --- #}
+    {# ▼▼▼ JavaScriptコードを修正 ▼▼▼ #}
     <script>
-        // ページの読み込みが完了したら実行
-        window.addEventListener('load', function() {
+        document.addEventListener('DOMContentLoaded', () => {
             // --- 画像モーダル処理 ---
             const modal = document.getElementById('imageModal');
-            const modalOverlay = document.getElementById('modalOverlay');
             const modalImage = document.getElementById('modalImage');
+            const closeModalButton = document.getElementById('closeModalButton');
+            const modalTriggers = document.querySelectorAll('.open-modal-trigger'); // トリガー要素を取得
 
             function closeModal() {
                 if (modal && modalImage) {
                     modal.classList.add('hidden');
                     modalImage.setAttribute('src', '');
-                    // モーダルが非表示の時はpointer-eventsをnoneに
-                    modal.style.pointerEvents = 'none';
                 }
             }
 
-            function openModal() {
-                if (modal && modalImage) {
-                    modal.classList.remove('hidden');
-                    // モーダルが表示の時はpointer-eventsをautoに
-                    modal.style.pointerEvents = 'auto';
-                }
-            }
-
-            // モーダルの背景をクリックした時の処理
-            if (modalOverlay) {
-                modalOverlay.onclick = function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    closeModal();
-                };
-            }
-
-            // ESCキーでモーダルを閉じる
-            document.onkeydown = function(e) {
-                if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
-                    closeModal();
-                }
-            };
-
-            // モーダルトリガーの処理
-            const modalTriggers = document.querySelectorAll('.open-modal-trigger');
+            // 各トリガーにイベントリスナーを設定
             modalTriggers.forEach(trigger => {
-                trigger.onclick = function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    const fullSrc = this.dataset.fullSrc;
+                trigger.addEventListener('click', (event) => {
+                    event.preventDefault(); // リンクの場合に備える
+                    event.stopPropagation(); // 他のイベントへの影響を防ぐ
+                    const fullSrc = trigger.dataset.fullSrc;
                     if (fullSrc && modal && modalImage) {
                         modalImage.setAttribute('src', fullSrc);
-                        openModal();
+                        modal.classList.remove('hidden');
                     }
-                };
+                });
             });
 
-            // 初期状態ではモーダルを非表示に
-            closeModal();
+            // モーダル閉じるボタン
+            if (closeModalButton) {
+                closeModalButton.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    closeModal();
+                });
+            }
+
+            // モーダル背景クリック
+            if (modal) {
+                modal.addEventListener('click', (event) => {
+                    if (event.target === modal) {
+                        closeModal();
+                    }
+                });
+            }
+
+            // Escキーでモーダルを閉じる
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
+                    closeModal();
+                }
+            });
 
             // --- いいね機能処理 ---
             function getCookie(name) {
@@ -269,121 +270,76 @@
             }
 
             const csrftoken = getCookie('csrftoken');
+            const likeButtons = document.querySelectorAll('.like-button');
 
-            // サイドバーのリンク処理
-            const sidebarLinks = document.querySelectorAll('aside a');
-            sidebarLinks.forEach(link => {
-                // イベントハンドラを削除
-                link.onclick = null;
-            });
+            function handleLikeButtonClick(button) {
+                const postId = button.dataset.postId;
+                const url = `/post/${postId}/like/`;  // URLパターンを修正
+                const likeCountSpan = button.querySelector('.like-count');
+                const likeIconSvg = button.querySelector('svg');
 
-            // ボトムナビゲーションのリンク処理
-            const bottomNavLinks = document.querySelectorAll('.bottom-nav a');
-            bottomNavLinks.forEach(link => {
-                // イベントハンドラを削除
-                link.onclick = null;
-            });
+                if (!url || !postId) {
+                    console.error('Like button missing data attributes');
+                    return;
+                }
 
-            // メインコンテンツのリンク処理
-            const mainContentLinks = document.querySelectorAll('main a:not(.like-button):not(.comment-button)');
-            mainContentLinks.forEach(link => {
-                // イベントハンドラを削除
-                link.onclick = null;
-            });
-
-            // いいねボタンの処理
-            document.querySelectorAll('.like-button').forEach(button => {
-                button.addEventListener('click', async function(e) {
-                    e.preventDefault();
-                    const postId = this.dataset.postId;
-                    const likeUrl = this.dataset.likeUrl;
-                    const likeIcon = this.querySelector('.like-icon');
-                    const likeCount = this.querySelector('.like-count');
-                    const isCurrentlyLiked = this.classList.contains('text-[#f2800d]');
-
-                    try {
-                        const response = await fetch(likeUrl, {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRFToken': getCookie('csrftoken'),
-                                'Content-Type': 'application/json'
-                            }
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrftoken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin'
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            throw new Error(`Network response was not ok: ${response.status} ${response.statusText}, Body: ${text}`);
                         });
-
-                        if (!response.ok) {
-                            throw new Error('Network response was not ok');
-                        }
-
-                        const data = await response.json();
-                        
-                        if (data.is_liked) {
-                            this.classList.remove('text-[#9c7349]');
-                            this.classList.add('text-[#f2800d]');
-                            likeIcon.innerHTML = '<path d="M128,216S24,160,24,94A54,54,0,0,1,78,40c22.59,0,41.94,12.31,50,32,8.06-19.69,27.41-32,50-32a54,54,0,0,1,54,54C232,160,128,216,128,216Z"></path>';
-                        } else {
-                            this.classList.remove('text-[#f2800d]');
-                            this.classList.add('text-[#9c7349]');
-                            likeIcon.innerHTML = '<path d="M178,32c-20.65,0-38.73,8.88-50,23.89C116.73,40.88,98.65,32,78,32A62.07,62.07,0,0,0,16,94c0,70,103.79,126.66,108.21,129a8,8,0,0,0,7.58,0C136.21,220.66,240,164,240,94A62.07,62.07,0,0,0,178,32ZM128,206.8C109.74,196.16,32,147.69,32,94A46.06,46.06,0,0,1,78,48c19.45,0,35.78,10.36,42.6,27a8,8,0,0,0,14.8,0c6.82-16.67,23.15-27,42.6-27a46.06,46.06,0,0,1,46,46C224,147.61,146.24,196.15,128,206.8Z"></path>';
-                        }
-                        
-                        likeCount.textContent = data.likes_count;
-                    } catch (error) {
-                        console.error('Error:', error);
-                        // エラーが発生した場合は元の状態に戻す
-                        if (isCurrentlyLiked) {
-                            this.classList.remove('text-[#f2800d]');
-                            this.classList.add('text-[#9c7349]');
-                            likeIcon.innerHTML = '<path d="M178,32c-20.65,0-38.73,8.88-50,23.89C116.73,40.88,98.65,32,78,32A62.07,62.07,0,0,0,16,94c0,70,103.79,126.66,108.21,129a8,8,0,0,0,7.58,0C136.21,220.66,240,164,240,94A62.07,62.07,0,0,0,178,32ZM128,206.8C109.74,196.16,32,147.69,32,94A46.06,46.06,0,0,1,78,48c19.45,0,35.78,10.36,42.6,27a8,8,0,0,0,14.8,0c6.82-16.67,23.15-27,42.6-27a46.06,46.06,0,0,1,46,46C224,147.61,146.24,196.15,128,206.8Z"></path>';
-                        } else {
-                            this.classList.remove('text-[#9c7349]');
-                            this.classList.add('text-[#f2800d]');
-                            likeIcon.innerHTML = '<path d="M128,216S24,160,24,94A54,54,0,0,1,78,40c22.59,0,41.94,12.31,50,32,8.06-19.69,27.41-32,50-32a54,54,0,0,1,54,54C232,160,128,216,128,216Z"></path>';
-                        }
                     }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data && typeof data.likes_count !== 'undefined' && typeof data.liked !== 'undefined') {
+                        if (likeCountSpan) {
+                            likeCountSpan.textContent = data.likes_count;
+                        }
+                        const likedColor = 'text-[#f2800d]';
+                        const unlikedColor = 'text-gray-500';
+                        const hoverColor = 'hover:text-[#f2800d]';
+
+                        if (data.liked) {
+                            button.classList.remove(unlikedColor, hoverColor);
+                            button.classList.add(likedColor);
+                            if (likeIconSvg) {
+                                likeIconSvg.innerHTML = '<path d="M128,216S24,160,24,94A54,54,0,0,1,78,40c22.59,0,41.94,12.31,50,32,8.06-19.69,27.41-32,50-32a54,54,0,0,1,54,54C232,160,128,216,128,216Z"></path>';
+                            }
+                        } else {
+                            button.classList.remove(likedColor);
+                            button.classList.add(unlikedColor, hoverColor);
+                            if (likeIconSvg) {
+                                likeIconSvg.innerHTML = '<path d="M178,32c-20.65,0-38.73,8.88-50,23.89C116.73,40.88,98.65,32,78,32A62.07,62.07,0,0,0,16,94c0,70,103.79,126.66,108.21,129a8,8,0,0,0,7.58,0C136.21,220.66,240,164,240,94A62.07,62.07,0,0,0,178,32ZM128,206.8C109.74,196.16,32,147.69,32,94A46.06,46.06,0,0,1,78,48c19.45,0,35.78,10.36,42.6,27a8,8,0,0,0,14.8,0c6.82-16.67,23.15-27,42.6-27a46.06,46.06,0,0,1,46,46C224,147.61,146.24,196.15,128,206.8Z"></path>';
+                            }
+                        }
+                    } else {
+                        console.error('Invalid data received from server for like toggle:', data);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error toggling like:', error);
+                });
+            }
+
+            // 各いいねボタンにイベントリスナーを設定
+            likeButtons.forEach(button => {
+                button.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    handleLikeButtonClick(button);
                 });
             });
 
-            // コメントボタンの処理
-            document.querySelectorAll('.comment-button').forEach(button => {
-                button.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    const postId = this.dataset.postId;
-                    const commentForm = document.querySelector(`#comment-form-${postId}`);
-                    if (commentForm) {
-                        commentForm.classList.toggle('hidden');
-                        if (!commentForm.classList.contains('hidden')) {
-                            commentForm.scrollIntoView({ behavior: 'smooth' });
-                        }
-                    }
-                });
-            });
-
-            // ログアウトフォームの処理
-            const logoutForms = document.querySelectorAll('form[action*="logout"]');
-            logoutForms.forEach(form => {
-                form.onsubmit = async function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    try {
-                        const response = await fetch(this.action, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRFToken': csrftoken
-                            }
-                        });
-                        if (response.ok) {
-                            window.location.reload();
-                        }
-                    } catch (error) {
-                        console.error('Error:', error);
-                    }
-                };
-            });
-        });
+        }); // End DOMContentLoaded listener
     </script>
     {# Alpine.js を読み込むスクリプト #}
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>

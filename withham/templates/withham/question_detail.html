@@ -1,0 +1,104 @@
+{% extends 'withham/base.html' %}
+
+{% block title %}質問詳細 - withham{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    {# 質問の詳細 #}
+    <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <div class="flex items-center gap-4 mb-4">
+            <a href="{% url 'withham:profile_detail' question.user.pk %}" class="flex items-center gap-2">
+                {% if question.user.profile.avatar %}
+                    <img src="{{ question.user.profile.avatar.url }}" alt="{{ question.user.username }}" class="w-10 h-10 rounded-full object-cover">
+                {% else %}
+                    <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path>
+                        </svg>
+                    </div>
+                {% endif %}
+                <span class="font-medium text-[#1c140d]">{{ question.user.username }}</span>
+            </a>
+            <span class="text-sm text-gray-500">{{ question.created_at|date:"Y/m/d H:i" }}</span>
+        </div>
+
+        <h1 class="text-2xl font-bold text-[#1c140d] mb-4">{{ question.title }}</h1>
+        <p class="text-gray-700 whitespace-pre-line">{{ question.content }}</p>
+
+        {# 質問のタグ #}
+        {% if question.tags.all %}
+        <div class="flex flex-wrap gap-2 mt-4">
+            {% for tag in question.tags.all %}
+            <a href="{% url 'withham:hashtag_search' tag.name %}" class="text-sm text-[#f2800d] hover:text-[#e67300]">
+                #{{ tag.name }}
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {# 質問のアクション（編集・削除） #}
+        {% if user == question.user %}
+        <div class="flex gap-4 mt-6">
+            <a href="{% url 'withham:question_edit' question.pk %}" class="text-[#f2800d] hover:text-[#e67300]">編集</a>
+            <form action="{% url 'withham:question_delete' question.pk %}" method="post" class="inline">
+                {% csrf_token %}
+                <button type="submit" class="text-red-500 hover:text-red-600" onclick="return confirm('質問を削除してもよろしいですか？')">削除</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+
+    {# 回答フォーム #}
+    {% if user.is_authenticated %}
+    <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <h2 class="text-xl font-bold text-[#1c140d] mb-4">回答を投稿</h2>
+        <form method="post" action="{% url 'withham:answer_create' question.pk %}">
+            {% csrf_token %}
+            <div class="mb-4">
+                <textarea name="content" rows="4" class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#f2800d] focus:border-transparent" placeholder="回答を入力してください"></textarea>
+            </div>
+            <button type="submit" class="bg-[#f2800d] text-white px-4 py-2 rounded-lg hover:bg-[#e67300]">回答を投稿</button>
+        </form>
+    </div>
+    {% endif %}
+
+    {# 回答一覧 #}
+    <div class="space-y-6">
+        <h2 class="text-xl font-bold text-[#1c140d] mb-4">回答一覧</h2>
+        {% for answer in answers %}
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <div class="flex items-center gap-4 mb-4">
+                <a href="{% url 'withham:profile_detail' answer.user.pk %}" class="flex items-center gap-2">
+                    {% if answer.user.profile.avatar %}
+                        <img src="{{ answer.user.profile.avatar.url }}" alt="{{ answer.user.username }}" class="w-10 h-10 rounded-full object-cover">
+                    {% else %}
+                        <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                            <svg class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path>
+                            </svg>
+                        </div>
+                    {% endif %}
+                    <span class="font-medium text-[#1c140d]">{{ answer.user.username }}</span>
+                </a>
+                <span class="text-sm text-gray-500">{{ answer.created_at|date:"Y/m/d H:i" }}</span>
+            </div>
+
+            <p class="text-gray-700 whitespace-pre-line">{{ answer.content }}</p>
+
+            {# 回答のアクション（編集・削除） #}
+            {% if user == answer.user %}
+            <div class="flex gap-4 mt-4">
+                <a href="{% url 'withham:answer_edit' answer.pk %}" class="text-[#f2800d] hover:text-[#e67300]">編集</a>
+                <form action="{% url 'withham:answer_delete' answer.pk %}" method="post" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" class="text-red-500 hover:text-red-600" onclick="return confirm('回答を削除してもよろしいですか？')">削除</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+        {% empty %}
+        <p class="text-gray-500 text-center">まだ回答はありません。</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %} 

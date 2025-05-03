@@ -172,3 +172,39 @@ class Notification(models.Model):
              return f'{self.actor.username} があなたをフォローしました'
         else:
             return f'{self.actor.username} {self.get_verb_display()}'
+
+
+# ★★★ Question モデルを追加 ★★★
+class Question(models.Model):
+    """飼育に関する質問モデル"""
+    title = models.CharField("質問タイトル", max_length=200)
+    text = models.TextField("質問内容")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='questions', verbose_name='質問者')
+    created_at = models.DateTimeField("質問日時", default=timezone.now)
+    is_resolved = models.BooleanField("解決済み", default=False)
+
+    class Meta:
+        verbose_name = '質問'
+        verbose_name_plural = '質問'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.title
+
+
+# ★★★ Answer モデルを追加 ★★★
+class Answer(models.Model):
+    """質問への回答モデル"""
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='answers', verbose_name='対象質問')
+    text = models.TextField("回答内容")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='answers', verbose_name='回答者')
+    created_at = models.DateTimeField("回答日時", default=timezone.now)
+    is_best_answer = models.BooleanField("ベストアンサー", default=False)
+
+    class Meta:
+        verbose_name = '回答'
+        verbose_name_plural = '回答'
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"Answer to {self.question.title} by {self.user.username}"
