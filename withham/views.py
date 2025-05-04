@@ -395,3 +395,36 @@ def question_create(request):
     context = {'form': form}
     return render(request, 'withham/question_form.html', context)
 
+# --- 質問編集 ---
+@login_required
+def question_edit(request, pk):
+    """質問編集ページ・処理"""
+    question = get_object_or_404(Question, pk=pk)
+    if question.user != request.user:
+        return HttpResponseForbidden("この質問を編集する権限がありません。")
+    
+    if request.method == 'POST':
+        form = QuestionForm(request.POST, instance=question)
+        if form.is_valid():
+            form.save()
+            return redirect('withham:question_detail', pk=question.pk)
+    else:
+        form = QuestionForm(instance=question)
+    
+    context = {'form': form, 'question': question}
+    return render(request, 'withham/question_form.html', context)
+
+# --- 質問削除 ---
+@login_required
+def question_delete(request, pk):
+    """質問削除処理"""
+    question = get_object_or_404(Question, pk=pk)
+    if question.user != request.user:
+        return HttpResponseForbidden("この質問を削除する権限がありません。")
+    
+    if request.method == 'POST':
+        question.delete()
+        return redirect('withham:question_list')
+    
+    return render(request, 'withham/question_confirm_delete.html', {'question': question})
+

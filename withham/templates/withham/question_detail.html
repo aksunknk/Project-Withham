@@ -1,104 +1,126 @@
-{% extends 'withham/base.html' %}
+{# withham/templates/withham/question_detail.html (回答ボタン確認) #}
 
-{% block title %}質問詳細 - withham{% endblock %}
+{% extends "withham/base.html" %}
+{% load static %}
+{% load humanize %}
+{% load withham_tags %} {# ハッシュタグリンク用カスタムタグ (必要なら) #}
+
+{% block title %}{{ question.title }} - 質問詳細 - withham{% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto">
-    {# 質問の詳細 #}
-    <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
-        <div class="flex items-center gap-4 mb-4">
-            <a href="{% url 'withham:profile_detail' question.user.pk %}" class="flex items-center gap-2">
+<div class="max-w-2xl mx-auto mt-8 px-4">
+
+    {# --- 質問内容 --- #}
+    <div class="bg-white p-6 md:p-8 rounded-xl shadow-md border border-gray-200 mb-6">
+        {# 質問タイトル #}
+        <h2 class="text-2xl font-bold text-[#1c140d] mb-3">{{ question.title }}</h2>
+
+        {# 質問者と日時 #}
+        <div class="flex items-center gap-2 text-sm text-gray-500 mb-4 pb-4 border-b border-gray-100">
+             <a href="{% url 'withham:profile_detail' question.user.pk %}" class="hover:underline">
                 {% if question.user.profile.avatar %}
-                    <img src="{{ question.user.profile.avatar.url }}" alt="{{ question.user.username }}" class="w-10 h-10 rounded-full object-cover">
+                    <img src="{{ question.user.profile.avatar.url }}" class="h-6 w-6 rounded-full object-cover inline-block" alt="{{ question.user.username }}">
                 {% else %}
-                    <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-                        <svg class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path>
-                        </svg>
-                    </div>
+                    <img src="{% static 'images/default_avatar.png' %}" class="h-6 w-6 rounded-full bg-gray-200 object-cover inline-block" alt="デフォルトアバター">
                 {% endif %}
-                <span class="font-medium text-[#1c140d]">{{ question.user.username }}</span>
+                <span class="ml-1 font-medium text-gray-700">@{{ question.user.username }}</span>
             </a>
-            <span class="text-sm text-gray-500">{{ question.created_at|date:"Y/m/d H:i" }}</span>
-        </div>
-
-        <h1 class="text-2xl font-bold text-[#1c140d] mb-4">{{ question.title }}</h1>
-        <p class="text-gray-700 whitespace-pre-line">{{ question.content }}</p>
-
-        {# 質問のタグ #}
-        {% if question.tags.all %}
-        <div class="flex flex-wrap gap-2 mt-4">
-            {% for tag in question.tags.all %}
-            <a href="{% url 'withham:hashtag_search' tag.name %}" class="text-sm text-[#f2800d] hover:text-[#e67300]">
-                #{{ tag.name }}
-            </a>
-            {% endfor %}
-        </div>
-        {% endif %}
-
-        {# 質問のアクション（編集・削除） #}
-        {% if user == question.user %}
-        <div class="flex gap-4 mt-6">
-            <a href="{% url 'withham:question_edit' question.pk %}" class="text-[#f2800d] hover:text-[#e67300]">編集</a>
-            <form action="{% url 'withham:question_delete' question.pk %}" method="post" class="inline">
-                {% csrf_token %}
-                <button type="submit" class="text-red-500 hover:text-red-600" onclick="return confirm('質問を削除してもよろしいですか？')">削除</button>
-            </form>
-        </div>
-        {% endif %}
-    </div>
-
-    {# 回答フォーム #}
-    {% if user.is_authenticated %}
-    <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
-        <h2 class="text-xl font-bold text-[#1c140d] mb-4">回答を投稿</h2>
-        <form method="post" action="{% url 'withham:answer_create' question.pk %}">
-            {% csrf_token %}
-            <div class="mb-4">
-                <textarea name="content" rows="4" class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#f2800d] focus:border-transparent" placeholder="回答を入力してください"></textarea>
-            </div>
-            <button type="submit" class="bg-[#f2800d] text-white px-4 py-2 rounded-lg hover:bg-[#e67300]">回答を投稿</button>
-        </form>
-    </div>
-    {% endif %}
-
-    {# 回答一覧 #}
-    <div class="space-y-6">
-        <h2 class="text-xl font-bold text-[#1c140d] mb-4">回答一覧</h2>
-        {% for answer in answers %}
-        <div class="bg-white rounded-xl shadow-sm p-6">
-            <div class="flex items-center gap-4 mb-4">
-                <a href="{% url 'withham:profile_detail' answer.user.pk %}" class="flex items-center gap-2">
-                    {% if answer.user.profile.avatar %}
-                        <img src="{{ answer.user.profile.avatar.url }}" alt="{{ answer.user.username }}" class="w-10 h-10 rounded-full object-cover">
-                    {% else %}
-                        <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-                            <svg class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path>
-                            </svg>
-                        </div>
-                    {% endif %}
-                    <span class="font-medium text-[#1c140d]">{{ answer.user.username }}</span>
-                </a>
-                <span class="text-sm text-gray-500">{{ answer.created_at|date:"Y/m/d H:i" }}</span>
-            </div>
-
-            <p class="text-gray-700 whitespace-pre-line">{{ answer.content }}</p>
-
-            {# 回答のアクション（編集・削除） #}
-            {% if user == answer.user %}
-            <div class="flex gap-4 mt-4">
-                <a href="{% url 'withham:answer_edit' answer.pk %}" class="text-[#f2800d] hover:text-[#e67300]">編集</a>
-                <form action="{% url 'withham:answer_delete' answer.pk %}" method="post" class="inline">
-                    {% csrf_token %}
-                    <button type="submit" class="text-red-500 hover:text-red-600" onclick="return confirm('回答を削除してもよろしいですか？')">削除</button>
-                </form>
-            </div>
+            <span>・</span>
+            <span>{{ question.created_at|timesince }}前</span>
+            {# 解決済みマーク (任意) #}
+            {% if question.is_resolved %}
+                <span class="ml-auto text-green-600 bg-green-100 px-2 py-0.5 rounded-full font-medium text-xs">解決済み</span>
+            {% endif %}
+            {# 編集・削除ボタン (質問者のみ) #}
+            {% if request.user == question.user %}
+                <div class="ml-auto text-xs">
+                    <a href="{% url 'withham:question_edit' question.pk %}" class="text-blue-600 hover:underline mr-2">編集</a>
+                    <a href="{% url 'withham:question_delete' question.pk %}" class="text-red-600 hover:underline">削除</a>
+                </div>
             {% endif %}
         </div>
+
+        {# 質問本文 #}
+        <div class="prose prose-sm max-w-none text-gray-800"> {# proseクラスでMarkdown風表示 #}
+            {{ question.text|linebreaksbr }}
+        </div>
+    </div>
+
+    {# --- 回答一覧 --- #}
+    <h3 class="text-xl font-semibold text-[#1c140d] mb-4">回答 ({{ answers.count }})</h3>
+    <div class="space-y-4 mb-8">
+        {% for answer in answers %}
+            <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                <div class="flex items-center gap-2 text-xs text-gray-500 mb-2">
+                    <a href="{% url 'withham:profile_detail' answer.author.pk %}" class="hover:underline">
+                        {% if answer.author.profile.avatar %}
+                            <img src="{{ answer.author.profile.avatar.url }}" class="h-6 w-6 rounded-full object-cover inline-block" alt="{{ answer.author.username }}">
+                        {% else %}
+                            <img src="{% static 'images/default_avatar.png' %}" class="h-6 w-6 rounded-full bg-gray-200 object-cover inline-block" alt="デフォルトアバター">
+                        {% endif %}
+                        <span class="ml-1 font-medium text-gray-700">@{{ answer.author.username }}</span>
+                    </a>
+                    <span>・</span>
+                    <span>{{ answer.created_at|timesince }}前</span>
+                    {# ベストアンサーマーク (任意) #}
+                    {% if answer.is_best_answer %}
+                         <span class="ml-auto text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded-full font-medium">ベストアンサー</span>
+                    {% elif request.user == question.user %} {# 質問者のみベストアンサー選択ボタン表示 (機能は未実装) #}
+                         <button class="ml-auto text-xs text-yellow-500 hover:text-yellow-700">ベストアンサーにする</button>
+                    {% endif %}
+                     {# 編集・削除ボタン (回答者のみ) #}
+                    {% if request.user == answer.author %}
+                        <div class="ml-auto text-xs {% if request.user != question.user %}ml-auto{% endif %}"> {# 位置調整 #}
+                            <a href="#" class="text-blue-600 hover:underline mr-2">編集</a> {# 編集機能は未実装 #}
+                            <a href="#" class="text-red-600 hover:underline">削除</a> {# 削除機能は未実装 #}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="text-sm text-gray-800 leading-relaxed">
+                    {{ answer.text|linebreaksbr }}
+                </div>
+                 {# 役に立ったボタン (任意) #}
+                 {# <div class="text-right mt-2">
+                     <button class="text-xs text-gray-500 hover:text-blue-600">役に立った</button>
+                 </div> #}
+            </div>
         {% empty %}
-        <p class="text-gray-500 text-center">まだ回答はありません。</p>
+            <p class="text-center text-gray-500 py-4">まだ回答はありません。</p>
         {% endfor %}
     </div>
+
+    {# --- 回答投稿フォーム --- #}
+    {% if user.is_authenticated %}
+        <div class="bg-white p-4 rounded-xl shadow-md border border-gray-200">
+            <h3 class="text-lg font-semibold text-[#1c140d] mb-3">回答を投稿する</h3>
+            <form method="post">
+                {% csrf_token %}
+                {# 回答フォームのエラー表示 #}
+                {% if answer_form.non_field_errors %}
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded relative mb-3 text-xs" role="alert">
+                    <ul class="list-disc list-inside">{% for error in answer_form.non_field_errors %}<li>{{ error }}</li>{% endfor %}</ul>
+                </div>
+                {% endif %}
+                {# 回答入力欄 #}
+                <div class="mb-3">
+                    {{ answer_form.text }}
+                    {% if answer_form.text.errors %}
+                        <p class="mt-1 text-xs text-red-600">{% for error in answer_form.text.errors %}{{ error }}{% endfor %}</p>
+                    {% endif %}
+                </div>
+                {# 送信ボタン #}
+                <div class="text-right">
+                    <button type="submit" class="inline-block bg-[#f2800d] hover:opacity-90 text-[#1c140d] font-semibold py-2 px-4 rounded-lg text-sm">
+                        回答する
+                    </button>
+                </div>
+            </form>
+        </div>
+    {% else %}
+        <p class="text-center text-gray-600 bg-gray-50 p-4 rounded-lg border">
+            回答するには<a href="{% url 'withham:login' %}?next={{ request.path }}" class="text-[#f2800d] hover:underline font-medium">ログイン</a>してください。
+        </p>
+    {% endif %}
+
 </div>
-{% endblock %} 
+{% endblock %}

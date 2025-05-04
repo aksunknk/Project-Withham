@@ -78,6 +78,8 @@ qa_patterns = [
     path('questions/', views.question_list, name='question_list'),             # 質問一覧
     path('questions/new/', views.question_create, name='question_create'),   # 新規質問作成
     path('questions/<int:pk>/', views.question_detail, name='question_detail'), # 質問詳細・回答
+    path('questions/<int:pk>/edit/', views.question_edit, name='question_edit'), # 質問編集
+    path('questions/<int:pk>/delete/', views.question_delete, name='question_delete'), # 質問削除
 ]
 
 

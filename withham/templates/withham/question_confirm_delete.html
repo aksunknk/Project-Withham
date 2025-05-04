@@ -1,0 +1,33 @@
+{# withham/templates/withham/question_confirm_delete.html #}
+
+{% extends "withham/base.html" %}
+{% load static %}
+
+{% block title %}質問の削除 - withham{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto mt-8 px-4">
+    <div class="bg-white p-6 md:p-8 rounded-xl shadow-md border border-gray-200">
+        <h2 class="text-2xl font-bold text-[#1c140d] mb-6">質問を削除しますか？</h2>
+
+        <div class="mb-6">
+            <h3 class="text-lg font-semibold text-[#1c140d] mb-2">{{ question.title }}</h3>
+            <p class="text-gray-700">{{ question.text|linebreaksbr }}</p>
+        </div>
+
+        <p class="text-red-600 mb-6">この操作は取り消せません。本当に削除しますか？</p>
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="flex justify-end gap-4">
+                <a href="{% url 'withham:question_detail' question.pk %}" class="text-gray-600 hover:text-gray-800">
+                    キャンセル
+                </a>
+                <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg">
+                    削除する
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %} 
