@@ -30,7 +30,7 @@ Withhamは、ユーザー同士がつながり、アイデアを共有できる�
 - Node.js 14以上
 - PostgreSQL
 
-### 1. リポジトリのクローン(SourceTreeでも可能)
+### 1. リポジトリのクローン
 ```bash
 git clone [リポジトリURL]
 cd withham_sns
