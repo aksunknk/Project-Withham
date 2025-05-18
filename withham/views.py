@@ -428,3 +428,46 @@ def question_delete(request, pk):
     
     return render(request, 'withham/question_confirm_delete.html', {'question': question})
 
+
+# ★★★ 健康記録編集ビューを追加 ★★★
+@login_required
+def health_log_edit(request, health_log_pk):
+    """特定の健康記録を編集する"""
+    log = get_object_or_404(HealthLog, pk=health_log_pk)
+    # 記録のハムスターの飼い主か確認
+    if log.hamster.owner != request.user:
+        return HttpResponseForbidden("この記録を編集する権限がありません。")
+
+    if request.method == 'POST':
+        form = HealthLogForm(request.POST, instance=log)
+        if form.is_valid():
+            form.save()
+            return redirect('withham:health_log_list', hamster_pk=log.hamster.pk)
+    else:
+        form = HealthLogForm(instance=log)
+
+    context = {
+        'form': form,
+        'hamster': log.hamster, # テンプレートでハムスター情報を参照するため
+        'log': log, # 編集対象のログを渡す (任意)
+    }
+    return render(request, 'withham/health_log_form.html', context)
+
+# ★★★ 健康記録削除ビューを追加 ★★★
+class HealthLogDeleteView(LoginRequiredMixin, DeleteView):
+    """健康記録削除ビュー (確認画面付き)"""
+    model = HealthLog
+    template_name = 'withham/health_log_confirm_delete.html' # 削除確認用テンプレート
+
+    # 削除を実行できるのはハムスターの飼い主のみにするためのチェック
+    def dispatch(self, request, *args, **kwargs):
+        log = self.get_object()
+        if log.hamster.owner != request.user:
+            return HttpResponseForbidden("この記録を削除する権限がありません。")
+        return super().dispatch(request, *args, **kwargs)
+
+    # 削除成功後のリダイレクト先
+    def get_success_url(self):
+        # 削除された記録のハムスターの健康記録一覧ページへ
+        return reverse_lazy('withham:health_log_list', kwargs={'hamster_pk': self.object.hamster.pk})
+

@@ -1,29 +1,22 @@
-{# withham/templates/withham/health_log_form.html (Tailwind CSS適用版) #}
+{# withham/templates/withham/health_log_form.html (編集対応) #}
 
-{% extends "withham/base.html" %} {# Tailwind適用済みのbase.htmlを継承 #}
+{% extends "withham/base.html" %}
 {% load static %}
 
-{% block title %}{{ hamster.name }} の健康記録 - withham{% endblock %}
+{# ▼▼▼ タイトルを編集時と新規作成時で変更 ▼▼▼ #}
+{% block title %}{% if form.instance.pk %}健康記録編集{% else %}新しい健康記録{% endif %} - {{ hamster.name }} - withham{% endblock %}
 
 {% block content %}
-<div class="max-w-xl mx-auto mt-8 px-4"> {# フォーム全体のコンテナ #}
-    <div class="bg-white p-6 md:p-8 rounded-xl shadow-md border border-gray-200"> {# カード風スタイル #}
+<div class="max-w-lg mx-auto mt-8 px-4">
+    <div class="bg-white p-6 md:p-8 rounded-xl shadow-md border border-gray-200">
+        {# ▼▼▼ h2タグのテキストも変更 ▼▼▼ #}
+        <h2 class="text-2xl font-bold text-center text-[#1c140d] mb-2">
+            {% if form.instance.pk %}健康記録を編集{% else %}新しい健康記録{% endif %}
+        </h2>
+        <p class="text-center text-gray-600 mb-6">🐹 <a href="#" class="hover:underline">{{ hamster.name }}</a></p> {# ハムスター詳細ページができたらリンク #}
 
-        {# どのハムスターの記録かを表示 #}
-        <div class="flex items-center gap-3 mb-6 border-b pb-4">
-            {% if hamster.profile_image %}
-                <img src="{{ hamster.profile_image.url }}" class="h-12 w-12 rounded-full object-cover" alt="{{ hamster.name }}">
-            {% else %}
-                <img src="{% static 'images/default_hamster_icon.svg' %}" class="h-12 w-12 rounded-full object-contain bg-gray-100 p-1" alt="デフォルト画像">
-            {% endif %}
-            <h2 class="text-xl font-bold text-[#1c140d]">
-                <a href="#" class="hover:underline">{{ hamster.name }}</a> の健康記録
-            </h2>
-        </div>
-
-
-        <form method="post"> {# actionは指定せず、現在のURLにPOST #}
-            {% csrf_token %} {# CSRF対策 #}
+        <form method="post">
+            {% csrf_token %}
 
             {# フォーム全体のエラー表示 #}
             {% if form.non_field_errors %}
@@ -37,39 +30,30 @@
                 </div>
             {% endif %}
 
-            {# --- 記録日フィールド (Date Input) --- #}
+            {# --- 記録日 --- #}
             <div class="mb-4">
                 <label for="{{ form.log_date.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">{{ form.log_date.label }}</label>
-                {# forms.pyのwidgetでクラス指定済みなのでそのまま表示 #}
-                {{ form.log_date }}
+                {{ form.log_date }} {# widgetでクラス指定済み #}
                 {% if form.log_date.errors %}
-                    <p class="mt-1 text-xs text-red-600">
-                        {% for error in form.log_date.errors %}{{ error }}{% endfor %}
-                    </p>
+                    <p class="mt-1 text-xs text-red-600">{% for error in form.log_date.errors %}{{ error }}{% endfor %}</p>
                 {% endif %}
             </div>
 
-            {# --- 体重フィールド (Number Input) --- #}
+            {# --- 体重 --- #}
             <div class="mb-4">
                 <label for="{{ form.weight_g.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">{{ form.weight_g.label }}</label>
-                 {# forms.pyのwidgetでクラス指定済みなのでそのまま表示 #}
-                {{ form.weight_g }}
+                {{ form.weight_g }} {# widgetでクラス指定済み #}
                 {% if form.weight_g.errors %}
-                    <p class="mt-1 text-xs text-red-600">
-                        {% for error in form.weight_g.errors %}{{ error }}{% endfor %}
-                    </p>
+                    <p class="mt-1 text-xs text-red-600">{% for error in form.weight_g.errors %}{{ error }}{% endfor %}</p>
                 {% endif %}
             </div>
 
-            {# --- 様子・メモフィールド (Textarea) --- #}
+            {# --- 様子・メモ --- #}
             <div class="mb-6">
                 <label for="{{ form.notes.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">{{ form.notes.label }}</label>
-                 {# forms.pyのwidgetでクラス指定済みなのでそのまま表示 #}
-                {{ form.notes }}
-                {% if form.notes.errors %}
-                    <p class="mt-1 text-xs text-red-600">
-                        {% for error in form.notes.errors %}{{ error }}{% endfor %}
-                    </p>
+                {{ form.notes }} {# widgetでクラス指定済み #}
+                 {% if form.notes.errors %}
+                    <p class="mt-1 text-xs text-red-600">{% for error in form.notes.errors %}{{ error }}{% endfor %}</p>
                 {% endif %}
             </div>
 
@@ -77,22 +61,15 @@
             <div class="mt-6">
                 <button type="submit"
                         class="w-full py-2 px-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-white">
-                    記録する
+                    {# ▼▼▼ ボタンテキストも変更 ▼▼▼ #}
+                    {% if form.instance.pk %}記録を更新{% else %}記録を追加{% endif %}
                 </button>
             </div>
-
+             {# 一覧へ戻るリンク #}
+            <div class="mt-4 text-center">
+                <a href="{% url 'withham:health_log_list' hamster.pk %}" class="text-sm text-gray-600 hover:underline">&laquo; {{ hamster.name }}の記録一覧に戻る</a>
+            </div>
         </form>
     </div>
 </div>
 {% endblock %}
-```
-
-**このコードのポイント:**
-
-* **`base.html` 継承:** Tailwind CSSが適用された `base.html` を継承します。
-* **ハムスター情報の表示:** ページの最初に、ビューから渡された `hamster` オブジェクトを使って、どのハムスターの記録ページなのかを表示しています。
-* **フォームの表示:** `{{ form.log_date }}`, `{{ form.weight_g }}`, `{{ form.notes }}` のように、ビューから渡された `form` オブジェクトの各フィールドを表示しています。`forms.py` の `widget` 属性でTailwindクラスを指定したので、ここではフィールド名だけでOKです。
-* **エラー表示:** 各フィールドの下にエラーメッセージを表示する部分も含まれています。
-* **ボタン:** 記録ボタンにスタイルを適用しています（例として緑色系のボタンにしています）。
-
-**次のステップ:**

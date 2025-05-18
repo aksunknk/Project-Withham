@@ -42,10 +42,14 @@ hamster_patterns = [
     path('hamsters/<int:pk>/delete/', HamsterDeleteView.as_view(), name='hamster_delete'),
 ]
 
-# 健康記録関連のURLパターン
+# ▼▼▼ 健康記録関連のURLパターンを修正 ▼▼▼
 health_log_patterns = [
     path('hamsters/<int:hamster_pk>/log/new/', views.health_log_create, name='health_log_create'),
     path('hamsters/<int:hamster_pk>/logs/', views.health_log_list, name='health_log_list'),
+    # ★★★ 編集用URLを追加 ★★★
+    path('logs/<int:health_log_pk>/edit/', views.health_log_edit, name='health_log_edit'),
+    # ★★★ 削除用URLを追加 (pk は health_log の pk) ★★★
+    path('logs/<int:pk>/delete/', views.HealthLogDeleteView.as_view(), name='health_log_delete'),
 ]
 
 # フォロー関連のURLパターン
@@ -86,6 +90,6 @@ qa_patterns = [
 # すべてのURLパターンを結合 (トップページ '/' は独立させる)
 urlpatterns = [
     path('', views.index, name='index'), # トップページ
-] + auth_patterns + post_patterns + profile_patterns + hamster_patterns + health_log_patterns + follow_patterns + search_patterns + notification_patterns + hashtag_patterns + comment_patterns + qa_patterns
+] + auth_patterns + post_patterns + profile_patterns + hamster_patterns + health_log_patterns + follow_patterns + search_patterns + notification_patterns + hashtag_patterns + comment_patterns + qa_patterns   
 # post_edit_patterns は post_patterns に統合済み
 
