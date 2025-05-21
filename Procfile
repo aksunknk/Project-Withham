@@ -1,1 +1,1 @@
-web: gunicorn withham_project.wsgi --log-file -
+web: gunicorn withham_project.wsgi:application
