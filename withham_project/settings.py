@@ -38,7 +38,7 @@ if not SECRET_KEY:
     print("Warning: SECRET_KEY environment variable not set, using default (unsafe).")
 # SECURITY WARNING: don't run with debug turned on in production!
 # 開発中はTrue、本番環境ではFalseにします
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'False') == 'True' # デフォルトはFalse
 
 # 開発中は空でOK、本番環境では許可するホスト名（ドメイン名）を設定します
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
@@ -100,15 +100,15 @@ TEMPLATES = [
 WSGI_APPLICATION = 'withham_project.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/stable/ref/settings/#databases
-# データベース設定：開発初期はSQLiteで十分です
-# settings.py の DATABASES 設定部分 (ローカル開発用に戻す)
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        # 環境変数 'DATABASE_URL' から接続情報を読み込む
+        # 未設定の場合は開発用のSQLiteを使う (ローカルテスト用)
+        default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
+        conn_max_age=600, # 任意: DB接続の再利用時間
+        # RenderのPostgreSQLでSSLが必要な場合がある
+        ssl_require=os.environ.get('DATABASE_SSL_REQUIRE', 'False') == 'True'
+    )
 }
 
 
@@ -191,3 +191,7 @@ STORAGES = {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
+
+CSRF_TRUSTED_ORIGINS = []
+if RENDER_EXTERNAL_HOSTNAME:
+    CSRF_TRUSTED_ORIGINS.append(f'https://{RENDER_EXTERNAL_HOSTNAME}')
