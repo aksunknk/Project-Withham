@@ -14,11 +14,12 @@
         <div class="flex flex-col sm:flex-row items-center">
             {# アバター画像 #}
             <div class="flex-shrink-0 mb-4 sm:mb-0 sm:mr-6">
-                {% if target_user.profile.avatar %} {# 変数名を target_user に変更 #}
+                {% if target_user.profile.avatar %}
                     <img src="{{ target_user.profile.avatar.url }}" class="h-24 w-24 rounded-full object-cover border-2 border-white shadow-md" alt="{{ target_user.username }}のプロフィール画像">
                 {% else %}
-                    <img src="{% static 'images/default_avatar.png' %}" class="h-24 w-24 rounded-full object-cover border-2 border-white shadow-md bg-gray-200" alt="デフォルトアバター">
-                    {# ↑ default_avatar.png は用意した画像ファイル名・パスに変更してください (staticディレクトリに画像が必要) #}
+                    <div class="h-24 w-24 rounded-full border-2 border-white shadow-md bg-gray-200 flex items-center justify-center">
+                        <i class="fas fa-user text-4xl text-gray-400"></i>
+                    </div>
                 {% endif %}
             </div>
 
