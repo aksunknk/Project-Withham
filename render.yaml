@@ -17,3 +17,7 @@
            value: dpg-d087bhs9c44c73bk65o0-a.singapore-postgres.render.com
          - key: DB_PORT
            value: 5432
+         - key: STATIC_URL
+           value: static/
+         - key: STATIC_ROOT
+           value: BASE_DIR / 'staticfiles'
