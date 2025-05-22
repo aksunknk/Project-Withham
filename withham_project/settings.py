@@ -38,7 +38,7 @@ if not SECRET_KEY:
     print("Warning: SECRET_KEY environment variable not set, using default (unsafe).")
 # SECURITY WARNING: don't run with debug turned on in production!
 # 開発中はTrue、本番環境ではFalseにします
-DEBUG = os.environ.get('DEBUG', 'False') == 'True' # デフォルトはFalse
+DEBUG = True
 
 # 開発中は空でOK、本番環境では許可するホスト名（ドメイン名）を設定します
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles', # 静的ファイル管理
     'django.contrib.humanize',    # 人間が読みやすい形式への変換
     'withham',                    # ★作成した withham アプリを追加
+    'storages',                   # S3用のストレージ
 ]
 
 # ミドルウェア：リクエスト/レスポンス処理の間に挟まる処理を定義します
@@ -101,14 +102,10 @@ WSGI_APPLICATION = 'withham_project.wsgi.application'
 
 
 DATABASES = {
-    'default': dj_database_url.config(
-        # 環境変数 'DATABASE_URL' から接続情報を読み込む
-        # 未設定の場合は開発用のSQLiteを使う (ローカルテスト用)
-        default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
-        conn_max_age=600, # 任意: DB接続の再利用時間
-        # RenderのPostgreSQLでSSLが必要な場合がある
-        ssl_require=os.environ.get('DATABASE_SSL_REQUIRE', 'False') == 'True'
-    )
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
 }
 
 
@@ -179,18 +176,27 @@ STATIC_URL = 'static/'
 # または import os して os.path.join(BASE_DIR, 'media') でも可
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-STORAGES = {
-    # ↓↓↓ デフォルトファイルストレージの設定を追加 ↓↓↓
-    "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
-    },
-    # ↑↑↑ ここまで追加 ↑↑↑
-
-    # 静的ファイル用ストレージ (whitenoise)
-    "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-    },
-}
+# 開発環境用の設定
+if DEBUG:
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
+else:
+    # 本番環境用のS3設定
+    AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
+    AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
+    AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
+    AWS_S3_OBJECT_PARAMETERS = {
+        'CacheControl': 'max-age=86400',
+    }
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/'
 
 CSRF_TRUSTED_ORIGINS = []
 if RENDER_EXTERNAL_HOSTNAME:
