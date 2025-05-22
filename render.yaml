@@ -2,7 +2,7 @@
      - type: web
        name: withham
        env: node
-       buildCommand: npm install && npm run build
+       buildCommand: npm install && npm run build && python manage.py migrate --noinput
        startCommand: npm start
        envVars:
          - key: NODE_ENV
