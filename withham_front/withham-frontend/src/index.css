@@ -1,0 +1,14 @@
+/* src/index.css */
+
+/* Google Fontsのインポート */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;700;900&family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap');
+
+/* Tailwind CSSの基本設定 */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* bodyに基本の背景色とフォントを適用 */
+body {
+  @apply bg-background font-sans;
+}

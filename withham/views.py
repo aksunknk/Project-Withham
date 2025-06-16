@@ -3,7 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 # アプリケーションのモデルをすべてインポート
-from .models import Post, User, UserProfile, Hamster, HealthLog, Comment
+from .models import Post, User, UserProfile, Hamster, HealthLog, Comment, Question, Answer
 
 # アプリケーションのシリアライザをすべてインポート
 from .serializers import (
@@ -17,6 +17,9 @@ from .serializers import (
     CommentSerializer,
     UserRegistrationSerializer,
     UserListSerializer,
+    AnswerSerializer,
+    QuestionSerializer,
+    QuestionDetailSerializer,
 )
 # カスタム権限をインポート
 from .permissions import IsOwnerOrReadOnly
@@ -33,7 +36,7 @@ class PostViewSet(viewsets.ModelViewSet):
     ordering_fields = ['created_at', 'likes_count'] # 作成日といいね数でソート可能に
     ordering = ['-created_at'] # デフォルトは新しい順
 
-     def get_serializer_class(self):
+    def get_serializer_class(self):
         if self.action == 'retrieve': # retrieveアクション（詳細表示）の場合
             return PostDetailSerializer
         return PostSerializer # それ以外（一覧表示など）は通常のPostSerializer
@@ -160,6 +163,35 @@ class CommentViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
+
+
+class QuestionViewSet(viewsets.ModelViewSet):
+    """質問の表示、作成、更新、削除を行うAPIビュー"""
+    queryset = Question.objects.all().select_related('user').prefetch_related('answers')
+    permission_classes = [IsOwnerOrReadOnly]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['title', 'text', 'user__username']
+    ordering = ['-created_at']
+
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return QuestionDetailSerializer
+        return QuestionSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class AnswerViewSet(viewsets.ModelViewSet):
+    """回答の作成、更新、削除を行うAPIビュー"""
+    queryset = Answer.objects.all()
+    serializer_class = AnswerSerializer
+    permission_classes = [IsOwnerOrReadOnly]
+
+    def perform_create(self, serializer):
+        # 回答の作成者をリクエストユーザーに設定
+        serializer.save(user=self.request.user)
+
 
 class UserRegistrationView(generics.CreateAPIView):
     """

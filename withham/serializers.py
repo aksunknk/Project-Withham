@@ -1,7 +1,7 @@
 # withham/serializers.py
 
 from rest_framework import serializers
-from .models import Post, User, UserProfile, Hamster, HealthLog, Comment
+from .models import Post, User, UserProfile, Hamster, HealthLog, Comment, Question, Answer
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 
@@ -183,3 +183,32 @@ class UserListSerializer(serializers.ModelSerializer):
             return False
         # リクエストユーザーが、リスト内のユーザー(obj)をフォローしているか
         return request.user.profile.following.filter(id=obj.id).exists()    
+    
+
+class AnswerSerializer(serializers.ModelSerializer):
+    user = PostAuthorSerializer(read_only=True) # ユーザー情報をネスト
+
+    class Meta:
+        model = Answer
+        fields = ['id', 'user', 'question', 'text', 'created_at', 'is_best_answer']
+        read_only_fields = ['user', 'is_best_answer']
+        extra_kwargs = {
+            'question': {'write_only': True}
+            }
+
+class QuestionSerializer(serializers.ModelSerializer):
+    user = PostAuthorSerializer(read_only=True)
+    answers_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Question
+        fields = ['id', 'title', 'user', 'created_at', 'is_resolved', 'answers_count']
+    
+    def get_answers_count(self, obj):
+        return obj.answers.count()
+
+class QuestionDetailSerializer(QuestionSerializer):
+    answers = AnswerSerializer(many=True, read_only=True)
+
+    class Meta(QuestionSerializer.Meta):
+        fields = QuestionSerializer.Meta.fields + ['text', 'answers']

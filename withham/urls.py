@@ -9,6 +9,8 @@ from .views import (
     HealthLogViewSet,
     CommentViewSet,
     UserRegistrationView,
+    QuestionViewSet,
+    AnswerViewSet,
 )
 
 # DefaultRouterのインスタンスを作成します
@@ -21,6 +23,9 @@ router.register(r'users', UserViewSet, basename='user')
 router.register(r'hamsters', HamsterViewSet, basename='hamster')
 router.register(r'healthlogs', HealthLogViewSet, basename='healthlog')
 router.register(r'comments', CommentViewSet, basename='comment')
+router.register(r'questions', QuestionViewSet, basename='question')
+router.register(r'answers', AnswerViewSet, basename='answer')
+
 
 # URLパターンのリストを定義します
 urlpatterns = [
