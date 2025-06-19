@@ -13,6 +13,8 @@ class UserProfile(models.Model):
     bio = models.TextField("自己紹介", blank=True, null=True)
     avatar = models.ImageField("プロフィール画像", upload_to='avatars/', null=True, blank=True)
     following = models.ManyToManyField(User, related_name='followers', symmetrical=False, blank=True)
+    # ↓↓↓ ブックマーク用のフィールドを追加 ↓↓↓
+    bookmarked_posts = models.ManyToManyField('Post', related_name='bookmarked_by', blank=True)
 
     def __str__(self):
         return self.user.username
@@ -208,3 +210,27 @@ class Answer(models.Model):
 
     def __str__(self):
         return f"Answer to {self.question.title} by {self.user.username}"
+
+class Schedule(models.Model):
+    """ハムスターの今後の予定を管理するモデル"""
+    hamster = models.ForeignKey(Hamster, on_delete=models.CASCADE, related_name='schedules', verbose_name='対象ハムスター')
+    title = models.CharField("タイトル", max_length=200)
+    schedule_date = models.DateField("予定日")
+    
+    EVENT_CHOICES = [
+        ('HOSPITAL', '病院'),
+        ('CLEANING', '掃除'),
+        ('BIRTHDAY', '誕生日'),
+        ('OTHER', 'その他'),
+    ]
+    category = models.CharField("カテゴリ", max_length=10, choices=EVENT_CHOICES, default='OTHER')
+    notes = models.TextField("メモ", blank=True, null=True)
+    created_at = models.DateTimeField("作成日時", auto_now_add=True)
+
+    class Meta:
+        ordering = ['schedule_date'] # 予定日で並べ替え
+        verbose_name = '予定'
+        verbose_name_plural = '予定'
+
+    def __str__(self):
+        return f"{self.hamster.name} - {self.schedule_date}: {self.title}"

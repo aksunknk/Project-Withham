@@ -1,7 +1,10 @@
 # withham/serializers.py
 
 from rest_framework import serializers
-from .models import Post, User, UserProfile, Hamster, HealthLog, Comment, Question, Answer
+from .models import (
+    Post, User, UserProfile, Hamster, HealthLog, Comment, Question, Answer, 
+    Notification, Tag, Schedule
+)
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 
@@ -13,7 +16,6 @@ class UserProfileForAuthorSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
         fields = ['avatar']
-
     def get_avatar(self, obj):
         request = self.context.get('request')
         if obj.avatar and hasattr(obj.avatar, 'url'):
@@ -35,19 +37,34 @@ class HealthLogSerializer(serializers.ModelSerializer):
         model = HealthLog
         fields = ['id', 'hamster', 'log_date', 'weight_g', 'notes', 'recorded_by', 'created_at']
 
+class ScheduleSerializer(serializers.ModelSerializer):
+    """スケジュールを扱うシリアライザ"""
+    hamster = serializers.PrimaryKeyRelatedField(queryset=Hamster.objects.all(), write_only=True)
+    class Meta:
+        model = Schedule
+        fields = ['id', 'hamster', 'title', 'schedule_date', 'category', 'notes', 'created_at']
+
 class HamsterSerializer(serializers.ModelSerializer):
     """ハムスターの情報を扱うシリアライザ"""
-    owner = serializers.HiddenField(default=serializers.CurrentUserDefault())
+    owner = serializers.PrimaryKeyRelatedField(read_only=True, default=serializers.CurrentUserDefault())
+    profile_image = serializers.SerializerMethodField()
     class Meta:
         model = Hamster
         fields = ['id', 'owner', 'name', 'breed', 'birthday', 'gender', 'profile_text', 'profile_image']
+    def get_profile_image(self, obj):
+        request = self.context.get('request')
+        if obj.profile_image and hasattr(obj.profile_image, 'url'):
+            return request.build_absolute_uri(obj.profile_image.url)
+        return None
+    def create(self, validated_data):
+        validated_data['owner'] = self.context['request'].user
+        return super().create(validated_data)
 
-class HamsterDetailSerializer(serializers.ModelSerializer):
-    """ハムスター詳細ページ用のシリアライザ"""
+class HamsterDetailSerializer(HamsterSerializer):
     health_logs = HealthLogSerializer(many=True, read_only=True)
-    class Meta:
-        model = Hamster
-        fields = ['id', 'owner', 'name', 'breed', 'birthday', 'gender', 'profile_text', 'profile_image', 'health_logs']
+    schedules = ScheduleSerializer(many=True, read_only=True) # schedulesを追加
+    class Meta(HamsterSerializer.Meta):
+        fields = HamsterSerializer.Meta.fields + ['health_logs', 'schedules'] # schedulesを追加
 
 class CommentSerializer(serializers.ModelSerializer):
     """コメントを扱うシリアライザ"""
@@ -57,6 +74,12 @@ class CommentSerializer(serializers.ModelSerializer):
         fields = ['id', 'author', 'post', 'text', 'created_at']
         extra_kwargs = { 'post': {'write_only': True} }
 
+class TagSerializer(serializers.ModelSerializer):
+    """シンプルなタグ情報"""
+    class Meta:
+        model = Tag
+        fields = ['id', 'name']
+
 class BasePostSerializer(serializers.ModelSerializer):
     """投稿の共通ロジックを持つベースシリアライザ"""
     author = PostAuthorSerializer(read_only=True)
@@ -64,44 +87,47 @@ class BasePostSerializer(serializers.ModelSerializer):
     is_liked = serializers.SerializerMethodField()
     hamster = HamsterSerializer(read_only=True)
     image = serializers.SerializerMethodField()
-
+    comments = CommentSerializer(many=True, read_only=True)
+    tags = TagSerializer(many=True, read_only=True)
+    is_bookmarked = serializers.SerializerMethodField()
     class Meta:
         model = Post
-        fields = ['id', 'author', 'text', 'image', 'created_at', 'likes_count', 'is_liked', 'hamster']
+        fields = ['id', 'author', 'text', 'image', 'created_at', 'likes_count', 'is_liked', 'hamster', 'comments', 'tags', 'is_bookmarked']
         read_only_fields = ['author']
-
     def get_likes_count(self, obj):
         return obj.likes.count()
-
     def get_is_liked(self, obj):
         request = self.context.get('request', None)
         if request is None or not request.user.is_authenticated: return False
         return obj.likes.filter(id=request.user.id).exists()
-    
     def get_image(self, obj):
         request = self.context.get('request')
         if obj.image and hasattr(obj.image, 'url'):
             return request.build_absolute_uri(obj.image.url)
         return None
+    def get_is_bookmarked(self, obj):
+        request = self.context.get('request', None)
+        if request is None or not request.user.is_authenticated: return False
+        return request.user.profile.bookmarked_posts.filter(pk=obj.pk).exists()
 
 # --- 各ページで利用するメインシリアライザ ---
 
-class PostSerializer(BasePostSerializer): pass
+class PostSerializer(BasePostSerializer):
+    class Meta(BasePostSerializer.Meta):
+        fields = [f for f in BasePostSerializer.Meta.fields if f != 'comments']
 
 class PostDetailSerializer(BasePostSerializer):
-    comments = CommentSerializer(many=True, read_only=True)
-    class Meta(BasePostSerializer.Meta):
-        fields = BasePostSerializer.Meta.fields + ['comments']
+    pass
 
-class PostForProfileSerializer(BasePostSerializer): pass
+class PostForProfileSerializer(BasePostSerializer):
+    class Meta(BasePostSerializer.Meta):
+        fields = [f for f in BasePostSerializer.Meta.fields if f != 'comments']
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    """プロフィール詳細や更新で使うシリアライザ"""
     avatar = serializers.SerializerMethodField()
     class Meta:
         model = UserProfile
         fields = ['bio', 'avatar']
-    
     def get_avatar(self, obj):
         request = self.context.get('request')
         if obj.avatar and hasattr(obj.avatar, 'url'):
@@ -109,51 +135,35 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return None
 
 class UserDetailSerializer(serializers.ModelSerializer):
-    """ユーザー詳細ページで使うシリアライザ"""
     profile = UserProfileSerializer(read_only=True)
     posts = PostForProfileSerializer(many=True, read_only=True)
-    
+    hamsters = HamsterSerializer(many=True, read_only=True)
     followers_count = serializers.SerializerMethodField()
     following_count = serializers.SerializerMethodField()
     is_following = serializers.SerializerMethodField()
-
     class Meta:
         model = User
-        # ↓↓↓ fieldsリストを更新 ↓↓↓
-        fields = [
-            'id', 'username', 'profile', 'posts',
-            'followers_count', 'following_count', 'is_following'
-        ]
+        fields = ['id', 'username', 'profile', 'posts', 'hamsters', 'followers_count', 'following_count', 'is_following']
     def get_followers_count(self, obj):
-        # プロフィールに紐づくフォロワーの数を返す
         return obj.followers.count()
-
     def get_following_count(self, obj):
-        # プロフィールのfollowingフィールドの数を返す
         return obj.profile.following.count()
-
     def get_is_following(self, obj):
-        # リクエストしてきたユーザーが、このプロフィール（obj）のフォロワーに含まれるか
         request = self.context.get('request', None)
-        if request is None or not request.user.is_authenticated:
-            return False
-        # obj.followers は UserProfileモデルのrelated_name
+        if request is None or not request.user.is_authenticated: return False
         return obj.followers.filter(user=request.user).exists()
-    
+
 class UserProfileUpdateSerializer(serializers.ModelSerializer):
-    """プロフィール更新APIで使うシリアライザ"""
     class Meta:
         model = UserProfile
         fields = ['bio', 'avatar']
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
-    """ユーザー登録用のシリアライザ"""
     password2 = serializers.CharField(style={'input_type': 'password'}, write_only=True)
     class Meta:
         model = User
         fields = ['username', 'email', 'password', 'password2']
         extra_kwargs = { 'password': {'write_only': True} }
-
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:
             raise serializers.ValidationError({"password": "Password fields didn't match."})
@@ -162,53 +172,54 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         except ValidationError as e:
             raise serializers.ValidationError({'password': list(e.messages)})
         return attrs
-
     def create(self, validated_data):
         validated_data.pop('password2')
         user = User.objects.create_user(**validated_data)
         return user
-    
+
 class UserListSerializer(serializers.ModelSerializer):
-    """フォロー・フォロワーリストで使うシンプルなユーザー情報"""
     profile = UserProfileForAuthorSerializer(read_only=True)
     is_following = serializers.SerializerMethodField()
-
     class Meta:
         model = User
         fields = ['id', 'username', 'profile', 'is_following']
-
     def get_is_following(self, obj):
         request = self.context.get('request', None)
-        if request is None or not request.user.is_authenticated:
-            return False
-        # リクエストユーザーが、リスト内のユーザー(obj)をフォローしているか
-        return request.user.profile.following.filter(id=obj.id).exists()    
-    
+        if request is None or not request.user.is_authenticated: return False
+        return request.user.profile.following.filter(id=obj.id).exists()
 
 class AnswerSerializer(serializers.ModelSerializer):
-    user = PostAuthorSerializer(read_only=True) # ユーザー情報をネスト
-
+    user = PostAuthorSerializer(read_only=True)
     class Meta:
         model = Answer
         fields = ['id', 'user', 'question', 'text', 'created_at', 'is_best_answer']
         read_only_fields = ['user', 'is_best_answer']
-        extra_kwargs = {
-            'question': {'write_only': True}
-            }
+        extra_kwargs = { 'question': {'write_only': True} }
 
 class QuestionSerializer(serializers.ModelSerializer):
     user = PostAuthorSerializer(read_only=True)
     answers_count = serializers.SerializerMethodField()
-    
     class Meta:
         model = Question
         fields = ['id', 'title', 'user', 'created_at', 'is_resolved', 'answers_count']
-    
     def get_answers_count(self, obj):
         return obj.answers.count()
 
 class QuestionDetailSerializer(QuestionSerializer):
     answers = AnswerSerializer(many=True, read_only=True)
-
     class Meta(QuestionSerializer.Meta):
         fields = QuestionSerializer.Meta.fields + ['text', 'answers']
+
+class NotificationSerializer(serializers.ModelSerializer):
+    actor = PostAuthorSerializer(read_only=True)
+    target_post_text = serializers.CharField(source='target.text', read_only=True, default='')
+    class Meta:
+        model = Notification
+        fields = ['id', 'actor', 'verb', 'target', 'target_post_text', 'is_read', 'timestamp']
+
+class TagDetailSerializer(serializers.ModelSerializer):
+    posts = PostSerializer(many=True, read_only=True)
+    class Meta:
+        model = Tag
+        fields = ['id', 'name', 'posts']
+
