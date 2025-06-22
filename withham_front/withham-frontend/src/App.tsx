@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
+import { AccountActivationPage } from './pages/AccountActivationPage';
 import { PostsPage } from './pages/PostsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { MyHamstersPage } from './pages/MyHamstersPage';
@@ -18,13 +19,16 @@ import { QuestionDetailPage } from './pages/QuestionDetailPage';
 import { QuestionFormPage } from './pages/QuestionFormPage';
 
 function App() {
+  console.log('=== App component rendering ===');
+  
   return (
     <AuthProvider>
       <BrowserRouter>
         <Routes>
           {/* 公開ルート */}
-          <Route path="/login" element={<GuestRoute />} />
+          <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
           <Route path="/signup" element={<SignupPage />} />
+          <Route path="/activate/:uidb64/:token" element={<AccountActivationPage />} />
 
           {/* 保護されたルート */}
           <Route element={<ProtectedRoute />}>
@@ -54,10 +58,19 @@ function App() {
   );
 }
 
-// ログイン済みのユーザーが/loginにアクセスするのを防ぐコンポーネント
-function GuestRoute() {
-    const { token } = useAuth();
-    return token ? <Navigate to="/" replace /> : <LoginPage />;
+// GuestRouteコンポーネントを追加
+function GuestRoute({ children }: { children: React.ReactNode }) {
+  const { token } = useAuth();
+  console.log('=== GuestRoute rendering ===');
+  console.log('token:', token ? 'exists' : 'null');
+  
+  if (token) {
+    console.log('User is authenticated, redirecting to home');
+    return <Navigate to="/" replace />;
+  }
+  
+  console.log('User is not authenticated, showing login page');
+  return <>{children}</>;
 }
 
 export default App;

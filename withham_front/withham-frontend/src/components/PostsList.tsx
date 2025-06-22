@@ -2,11 +2,10 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { Post } from '../types';
-import { HeartIcon, TrashIcon, UserIcon, CommentIcon } from './Icons';
+import { HeartIcon, TrashIcon, UserIcon, CommentIcon, EditIcon } from './Icons';
 
 type PostsListProps = {
   posts: Post[];
@@ -38,9 +37,15 @@ export function PostsList({ posts, setPosts }: PostsListProps) {
     try {
         await api.delete(`/api/posts/${postId}/`);
         setPosts(posts.filter(post => post.id !== postId));
-    } catch (err) {
+    } catch (error) {
+        console.error("投稿の削除に失敗しました:", error);
         alert("投稿の削除に失敗しました。");
     }
+  };
+
+  const handleEditPost = (postId: number) => {
+    // 編集ページに遷移
+    window.location.href = `/posts/${postId}/edit`;
   };
 
   if (posts.length === 0) {
@@ -50,32 +55,63 @@ export function PostsList({ posts, setPosts }: PostsListProps) {
   return (
     <div className="space-y-4">
       {posts.map(post => (
-        <div key={post.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div key={post.id} className={`rounded-xl shadow-sm border overflow-hidden ${
+          post.hamster 
+            ? 'bg-orange-50 border-orange-200' 
+            : 'bg-white border-gray-200'
+        }`}>
           <div className="flex items-center gap-4 p-4">
-            <Link to={`/profile/${post.author.id}`}>
-              {post.author.profile?.avatar ? (
-                <img src={post.author.profile.avatar} alt={post.author.username} className="w-12 h-12 rounded-full object-cover" />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-surface flex items-center justify-center">
-                  <UserIcon className="w-6 h-6 text-text-sub" />
-                </div>
-              )}
-            </Link>
-            <div className="flex-1">
-              <Link to={`/profile/${post.author.id}`} className="text-text-main font-medium hover:underline">
-                {post.author.username}
+            {post.hamster ? (
+              <Link to={`/hamsters/${post.hamster.id}`}>
+                {post.hamster.profile_image ? (
+                  <img src={post.hamster.profile_image} alt={post.hamster.name} className="w-12 h-12 rounded-full object-cover" />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
+                  </div>
+                )}
               </Link>
-              {post.hamster && (
-                <span className="text-sm text-text-sub ml-2">
-                  (for <Link to={`/hamsters/${post.hamster.id}`} className="font-semibold hover:underline">{post.hamster.name}</Link>)
-                </span>
+            ) : (
+              <Link to={`/profile/${post.author.id}`}>
+                {post.author.profile?.avatar ? (
+                  <img src={post.author.profile.avatar} alt={post.author.username} className="w-12 h-12 rounded-full object-cover" />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-surface flex items-center justify-center">
+                    <UserIcon className="w-6 h-6 text-text-sub" />
+                  </div>
+                )}
+              </Link>
+            )}
+            <div className="flex-1">
+              {post.hamster ? (
+                <div>
+                  <Link to={`/hamsters/${post.hamster.id}`} className="text-text-main font-medium hover:underline">
+                    {post.hamster.name}
+                  </Link>
+                  <span className="text-sm text-text-sub ml-2">
+                    ({post.author.username})
+                  </span>
+                  <div className="mt-1">
+                    <span className="inline-block bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full">
+                      🐹 ハムスター投稿
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <Link to={`/profile/${post.author.id}`} className="text-text-main font-medium hover:underline">
+                  {post.author.username}
+                </Link>
               )}
               <p className="text-text-sub text-xs">{new Date(post.created_at).toLocaleString('ja-JP')}</p>
             </div>
             {currentUser?.id === post.author.id && (
-                <button onClick={() => handleDeletePost(post.id)} className="p-2 rounded-full hover:bg-surface" title="削除する">
-                    <TrashIcon className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-1">
+                    <button onClick={() => handleEditPost(post.id)} className="p-2 rounded-full hover:bg-surface" title="編集する">
+                        <EditIcon className="w-5 h-5" />
+                    </button>
+                    <button onClick={() => handleDeletePost(post.id)} className="p-2 rounded-full hover:bg-surface" title="削除する">
+                        <TrashIcon className="w-5 h-5" />
+                    </button>
+                </div>
             )}
           </div>
 

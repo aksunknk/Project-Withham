@@ -7,6 +7,12 @@ from .models import (
 )
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.conf import settings
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode
+from django.utils.encoding import force_bytes
+from django.core.mail import send_mail
+
 
 # --- ベースとなるヘルパーシリアライザ ---
 
@@ -16,6 +22,7 @@ class UserProfileForAuthorSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
         fields = ['avatar']
+
     def get_avatar(self, obj):
         request = self.context.get('request')
         if obj.avatar and hasattr(obj.avatar, 'url'):
@@ -38,7 +45,7 @@ class HealthLogSerializer(serializers.ModelSerializer):
         fields = ['id', 'hamster', 'log_date', 'weight_g', 'notes', 'recorded_by', 'created_at']
 
 class ScheduleSerializer(serializers.ModelSerializer):
-    """スケジュールを扱うシリアライザ"""
+    """今後の予定を扱うシリアライザ"""
     hamster = serializers.PrimaryKeyRelatedField(queryset=Hamster.objects.all(), write_only=True)
     class Meta:
         model = Schedule
@@ -61,10 +68,12 @@ class HamsterSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 class HamsterDetailSerializer(HamsterSerializer):
+    """ハムスター詳細ページ用のシリアライザ"""
     health_logs = HealthLogSerializer(many=True, read_only=True)
-    schedules = ScheduleSerializer(many=True, read_only=True) # schedulesを追加
+    schedules = ScheduleSerializer(many=True, read_only=True)
+    age = serializers.CharField(read_only=True)
     class Meta(HamsterSerializer.Meta):
-        fields = HamsterSerializer.Meta.fields + ['health_logs', 'schedules'] # schedulesを追加
+        fields = HamsterSerializer.Meta.fields + ['health_logs', 'schedules', 'age']
 
 class CommentSerializer(serializers.ModelSerializer):
     """コメントを扱うシリアライザ"""
@@ -79,11 +88,11 @@ class TagSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tag
         fields = ['id', 'name']
-
+        
 class BasePostSerializer(serializers.ModelSerializer):
-    """投稿の共通ロジックを持つベースシリアライザ"""
+    """投稿の「読み取り」時に使用する共通ロジック"""
     author = PostAuthorSerializer(read_only=True)
-    likes_count = serializers.SerializerMethodField()
+    likes_count = serializers.IntegerField(read_only=True)
     is_liked = serializers.SerializerMethodField()
     hamster = HamsterSerializer(read_only=True)
     image = serializers.SerializerMethodField()
@@ -93,13 +102,11 @@ class BasePostSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
         fields = ['id', 'author', 'text', 'image', 'created_at', 'likes_count', 'is_liked', 'hamster', 'comments', 'tags', 'is_bookmarked']
-        read_only_fields = ['author']
-    def get_likes_count(self, obj):
-        return obj.likes.count()
     def get_is_liked(self, obj):
         request = self.context.get('request', None)
-        if request is None or not request.user.is_authenticated: return False
-        return obj.likes.filter(id=request.user.id).exists()
+        if request and hasattr(request, "user") and request.user.is_authenticated:
+            return obj.likes.filter(id=request.user.id).exists()
+        return False
     def get_image(self, obj):
         request = self.context.get('request')
         if obj.image and hasattr(obj.image, 'url'):
@@ -107,11 +114,22 @@ class BasePostSerializer(serializers.ModelSerializer):
         return None
     def get_is_bookmarked(self, obj):
         request = self.context.get('request', None)
-        if request is None or not request.user.is_authenticated: return False
-        return request.user.profile.bookmarked_posts.filter(pk=obj.pk).exists()
+        if request and hasattr(request, "user") and request.user.is_authenticated:
+            return request.user.profile.bookmarked_posts.filter(pk=obj.pk).exists()
+        return False
+
+# --- 投稿作成・更新用のシリアライザ ---
+class PostCreateUpdateSerializer(serializers.ModelSerializer):
+    """投稿の作成・更新時に使用するシリアライザ"""
+    hamster = serializers.PrimaryKeyRelatedField(
+        queryset=Hamster.objects.all(), required=False, allow_null=True
+    )
+    image = serializers.ImageField(required=False, allow_null=True)
+    class Meta:
+        model = Post
+        fields = ['text', 'image', 'hamster']
 
 # --- 各ページで利用するメインシリアライザ ---
-
 class PostSerializer(BasePostSerializer):
     class Meta(BasePostSerializer.Meta):
         fields = [f for f in BasePostSerializer.Meta.fields if f != 'comments']
@@ -150,8 +168,9 @@ class UserDetailSerializer(serializers.ModelSerializer):
         return obj.profile.following.count()
     def get_is_following(self, obj):
         request = self.context.get('request', None)
-        if request is None or not request.user.is_authenticated: return False
-        return obj.followers.filter(user=request.user).exists()
+        if request and hasattr(request, "user") and request.user.is_authenticated:
+            return obj.followers.filter(user=request.user).exists()
+        return False
 
 class UserProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -163,7 +182,11 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['username', 'email', 'password', 'password2']
-        extra_kwargs = { 'password': {'write_only': True} }
+        extra_kwargs = { 'password': {'write_only': True}, 'email': {'required': True} }
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("このメールアドレスは既に使用されています。")
+        return value
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:
             raise serializers.ValidationError({"password": "Password fields didn't match."})
@@ -174,7 +197,13 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return attrs
     def create(self, validated_data):
         validated_data.pop('password2')
-        user = User.objects.create_user(**validated_data)
+        user = User.objects.create_user(**validated_data, is_active=False)
+        token = default_token_generator.make_token(user)
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        activation_url = f"http://localhost:5173/activate/{uid}/{token}"
+        subject = 'アカウントの有効化をお願いします - withham'
+        message = f"withhamへのご登録ありがとうございます！\n\n以下のリンクをクリックして、アカウントの有効化を完了してください。\n\n{activation_url}\n\nもしこのメールに心当たりがない場合は、お手数ですが無視してください。"
+        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=False)
         return user
 
 class UserListSerializer(serializers.ModelSerializer):
@@ -185,8 +214,9 @@ class UserListSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'profile', 'is_following']
     def get_is_following(self, obj):
         request = self.context.get('request', None)
-        if request is None or not request.user.is_authenticated: return False
-        return request.user.profile.following.filter(id=obj.id).exists()
+        if request and hasattr(request, "user") and request.user.is_authenticated:
+            return request.user.profile.following.filter(id=obj.id).exists()
+        return False
 
 class AnswerSerializer(serializers.ModelSerializer):
     user = PostAuthorSerializer(read_only=True)
@@ -222,4 +252,3 @@ class TagDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tag
         fields = ['id', 'name', 'posts']
-

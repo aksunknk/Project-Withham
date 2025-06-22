@@ -24,7 +24,7 @@ export function PostDetailPage() {
       try {
         const response = await api.get<Post>(`/api/posts/${postId}/`);
         setPost(response.data);
-      } catch (err) {
+      } catch {
         setError("投稿の読み込みに失敗しました。");
       } finally {
         setLoading(false);
@@ -51,7 +51,9 @@ export function PostDetailPage() {
         try {
             await api.delete(`/api/posts/${post.id}/`);
             navigate('/');
-        } catch (err) { alert("投稿の削除に失敗しました。"); }
+        } catch {
+            alert("投稿の削除に失敗しました。");
+        }
     }
   };
 
@@ -61,17 +63,51 @@ export function PostDetailPage() {
 
   return (
     <div className="w-full max-w-2xl mx-auto">
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200">
+      <div className={`rounded-xl shadow-sm overflow-hidden border ${
+        post.hamster 
+          ? 'bg-orange-50 border-orange-200' 
+          : 'bg-white border-gray-200'
+      }`}>
         <div className="p-4 flex items-center gap-3 border-b border-gray-100">
-          <Link to={`/profile/${post.author.id}`}>
-            {post.author.profile?.avatar ? (
-              <img src={post.author.profile.avatar} alt={post.author.username} className="h-10 w-10 rounded-full object-cover"/>
-            ) : (
-              <div className="h-10 w-10 rounded-full bg-surface flex items-center justify-center"><UserIcon className="w-5 h-5 text-text-sub"/></div>
-            )}
-          </Link>
+          {post.hamster ? (
+            <Link to={`/hamsters/${post.hamster.id}`}>
+              {post.hamster.profile_image ? (
+                <img src={post.hamster.profile_image} alt={post.hamster.name} className="h-10 w-10 rounded-full object-cover"/>
+              ) : (
+                <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center">
+                  {/* ここは空、またはテキストやデフォルト画像など */}
+                </div>
+              )}
+            </Link>
+          ) : (
+            <Link to={`/profile/${post.author.id}`}>
+              {post.author.profile?.avatar ? (
+                <img src={post.author.profile.avatar} alt={post.author.username} className="h-10 w-10 rounded-full object-cover"/>
+              ) : (
+                <div className="h-10 w-10 rounded-full bg-surface flex items-center justify-center">
+                  <UserIcon className="w-5 h-5 text-text-sub"/>
+                </div>
+              )}
+            </Link>
+          )}
           <div>
-            <Link to={`/profile/${post.author.id}`} className="text-text-main text-sm font-semibold hover:underline">@{post.author.username}</Link>
+            {post.hamster ? (
+              <div>
+                <Link to={`/hamsters/${post.hamster.id}`} className="text-text-main text-sm font-semibold hover:underline">
+                  {post.hamster.name}
+                </Link>
+                <span className="text-text-sub text-xs ml-2">
+                  ({post.author.username})
+                </span>
+                <div className="mt-1">
+                  <span className="inline-block bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full">
+                    🐹 ハムスター投稿
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <Link to={`/profile/${post.author.id}`} className="text-text-main text-sm font-semibold hover:underline">@{post.author.username}</Link>
+            )}
             <p className="text-text-sub text-xs">{new Date(post.created_at).toLocaleString('ja-JP')}</p>
           </div>
           {currentUser?.id === post.author.id && (

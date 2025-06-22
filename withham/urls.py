@@ -16,6 +16,9 @@ from .views import (
     BookmarkedPostsViewSet,
     TagViewSet,
     ScheduleViewSet,
+    TrendingTagsView,
+    UserRegistrationView,
+    AccountActivationView,
 )
 
 router = DefaultRouter()
@@ -31,11 +34,15 @@ router.register(r'bookmarks', BookmarkedPostsViewSet, basename='bookmark')
 router.register(r'tags', TagViewSet, basename='tag')
 router.register(r'schedules', ScheduleViewSet, basename='schedule')
 
+
 urlpatterns = [
     # カスタム、非ルーターパス
+    path('tags/trending/', TrendingTagsView.as_view(), name='trending-tags'),
     path('profile/', UserProfileUpdateView.as_view(), name='profile-detail-update'),
     path('notifications/unread_count/', UnreadNotificationCountView.as_view(), name='unread-notification-count'),
-
+    path('register/', UserRegistrationView.as_view(), name='user-register'),
+    path('activate/<uidb64>/<token>/', AccountActivationView.as_view(), name='account_activation'),
+    
     # ルーターが生成するパス
     path('', include(router.urls)),
 ]

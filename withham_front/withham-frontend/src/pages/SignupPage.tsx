@@ -31,8 +31,8 @@ export function SignupPage() {
         password,
         password2,
       });
-      // 登録成功後、ログインページに移動
-      alert("登録が完了しました。ログインしてください。");
+      // 登録成功後、メール確認について説明
+      alert("登録が完了しました。メールをご確認いただき、アカウントの有効化を行ってください。");
       navigate('/login');
     } catch (err) {
       if (axios.isAxiosError(err) && err.response) {

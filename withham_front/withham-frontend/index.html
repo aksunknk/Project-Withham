@@ -7,7 +7,23 @@
     <title>Vite + React + TS</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div style="padding: 20px; background-color: #f0f0f0; border: 2px solid #333;">
+        <h1>Loading React App...</h1>
+        <p>If you see this message, React has not loaded yet.</p>
+        <p>Check the browser console for any errors.</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      console.log('=== HTML loaded ===');
+      console.log('Root element:', document.getElementById('root'));
+      
+      // Reactが読み込まれるまで待機
+      setTimeout(() => {
+        console.log('=== After timeout ===');
+        console.log('Root element content:', document.getElementById('root').innerHTML);
+      }, 2000);
+    </script>
   </body>
 </html>
