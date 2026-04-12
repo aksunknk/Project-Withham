@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import type { UserDetail, UserProfile, Post } from '../types';
+import type { UserDetail, UserProfile } from '../types';
 import { EditProfileModal } from '../components/EditProfileModal';
 import { ProfileIcon } from '../components/Icons';
 

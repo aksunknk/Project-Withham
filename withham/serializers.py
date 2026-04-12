@@ -39,17 +39,21 @@ class PostAuthorSerializer(serializers.ModelSerializer):
 class HealthLogSerializer(serializers.ModelSerializer):
     """健康記録を扱うシリアライザ"""
     recorded_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
-    hamster = serializers.PrimaryKeyRelatedField(queryset=Hamster.objects.all(), write_only=True)
+    hamster = serializers.PrimaryKeyRelatedField(queryset=Hamster.objects.all())
+    hamster_name = serializers.CharField(source='hamster.name', read_only=True)
+
     class Meta:
         model = HealthLog
-        fields = ['id', 'hamster', 'log_date', 'weight_g', 'notes', 'recorded_by', 'created_at']
+        fields = ['id', 'hamster', 'hamster_name', 'log_date', 'weight_g', 'notes', 'recorded_by', 'created_at']
 
 class ScheduleSerializer(serializers.ModelSerializer):
     """今後の予定を扱うシリアライザ"""
-    hamster = serializers.PrimaryKeyRelatedField(queryset=Hamster.objects.all(), write_only=True)
+    hamster = serializers.PrimaryKeyRelatedField(queryset=Hamster.objects.all())
+    hamster_name = serializers.CharField(source='hamster.name', read_only=True)
+
     class Meta:
         model = Schedule
-        fields = ['id', 'hamster', 'title', 'schedule_date', 'category', 'notes', 'created_at']
+        fields = ['id', 'hamster', 'hamster_name', 'title', 'schedule_date', 'category', 'notes', 'created_at']
 
 class HamsterSerializer(serializers.ModelSerializer):
     """ハムスターの情報を扱うシリアライザ"""
@@ -200,7 +204,8 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         user = User.objects.create_user(**validated_data, is_active=False)
         token = default_token_generator.make_token(user)
         uid = urlsafe_base64_encode(force_bytes(user.pk))
-        activation_url = f"http://localhost:5173/activate/{uid}/{token}"
+        base = settings.ACTIVATION_FRONTEND_BASE_URL.rstrip("/")
+        activation_url = f"{base}/activate/{uid}/{token}"
         subject = 'アカウントの有効化をお願いします - withham'
         message = f"withhamへのご登録ありがとうございます！\n\n以下のリンクをクリックして、アカウントの有効化を完了してください。\n\n{activation_url}\n\nもしこのメールに心当たりがない場合は、お手数ですが無視してください。"
         send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=False)
@@ -246,6 +251,14 @@ class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notification
         fields = ['id', 'actor', 'verb', 'target', 'target_post_text', 'is_read', 'timestamp']
+
+
+class NotificationPartialUpdateSerializer(serializers.ModelSerializer):
+    """既読更新のみ許可"""
+
+    class Meta:
+        model = Notification
+        fields = ['is_read']
 
 class TagDetailSerializer(serializers.ModelSerializer):
     posts = PostSerializer(many=True, read_only=True)

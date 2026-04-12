@@ -11,11 +11,18 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
-import os # python-dotenvのために追加
-from datetime import timedelta # simplejwtのために追加
+import os
+from datetime import timedelta
+
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _split_csv(env_key: str, default: str = "") -> list[str]:
+    raw = os.environ.get(env_key, default)
+    return [x.strip() for x in raw.split(",") if x.strip()]
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
@@ -27,7 +34,13 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-default-key-fo
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
 
 
-ALLOWED_HOSTS = []
+# 本番では DJANGO_ALLOWED_HOSTS=example.com,api.example.com のように指定
+ALLOWED_HOSTS = _split_csv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
+
+# サインアップ時メール内の有効化リンク（フロントのオリジン）
+ACTIVATION_FRONTEND_BASE_URL = os.environ.get(
+    "DJANGO_ACTIVATION_FRONTEND_URL", "http://localhost:5173"
+).rstrip("/")
 
 
 # Application definition
@@ -58,9 +71,9 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# React開発サーバーからのアクセスを許可
+# React（Vite）開発用の既定オリジン + DJANGO_CORS_ORIGINS で追記（本番フロントのURLなど）
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173", # Viteのデフォルト
+    "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:5174",
     "http://localhost:5175",
@@ -71,6 +84,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5176",
     "http://127.0.0.1:5177",
 ]
+CORS_ALLOWED_ORIGINS.extend(_split_csv("DJANGO_CORS_ORIGINS"))
 
 # 開発環境用の追加CORS設定
 if DEBUG:
@@ -95,6 +109,8 @@ if DEBUG:
         'x-csrftoken',
         'x-requested-with',
     ]
+else:
+    CORS_ALLOW_ALL_ORIGINS = False
 
 ROOT_URLCONF = 'withham_project.urls'
 
@@ -120,12 +136,17 @@ WSGI_APPLICATION = 'withham_project.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# DATABASE_URL が設定されていれば PostgreSQL 等（dj-database-url）、未設定なら SQLite
+_database_url = os.environ.get("DATABASE_URL")
+if _database_url:
+    DATABASES = {'default': dj_database_url.config(default=_database_url, conn_max_age=600)}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
 
 
 # Password validation

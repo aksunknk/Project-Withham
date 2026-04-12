@@ -3,7 +3,17 @@
 import React from 'react';
 import { NavLink, Link, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { HouseIcon, UserIcon, QuestionIcon, CompassIcon, BookmarkIcon, CalendarIcon } from './Icons';
+import {
+  HouseIcon,
+  UserIcon,
+  QuestionIcon,
+  CompassIcon,
+  BookmarkIcon,
+  CalendarIcon,
+  SparklesIcon,
+  BellIcon,
+  PlusCircleIcon,
+} from './Icons';
 import { RightSidebar } from './RightSidebar';
 
 export function Layout() {
@@ -22,8 +32,11 @@ export function Layout() {
                 <nav className="flex flex-col gap-2">
                     <Link to="/" className="text-2xl font-bold text-text-main hover:text-primary mb-4">withham</Link>
                     <NavLink to="/" className={({ isActive }) => isActive ? activeNavLinkClass : navLinkClass} end><HouseIcon /><p className="text-sm font-medium">Home</p></NavLink>
+                    <NavLink to="/explore" className={({ isActive }) => isActive ? activeNavLinkClass : navLinkClass}><SparklesIcon /><p className="text-sm font-medium">探索</p></NavLink>
+                    <NavLink to="/create" className={({ isActive }) => isActive ? activeNavLinkClass : navLinkClass}><PlusCircleIcon /><p className="text-sm font-medium">投稿</p></NavLink>
+                    <NavLink to="/notifications" className={({ isActive }) => isActive ? activeNavLinkClass : navLinkClass}><BellIcon /><p className="text-sm font-medium">通知</p></NavLink>
                     <NavLink to="/qa" className={({ isActive }) => isActive ? activeNavLinkClass : navLinkClass}><QuestionIcon /><p className="text-sm font-medium">Q&A</p></NavLink>
-                    <NavLink to="/hamsters" className={({ isActive }) => isActive ? activeNavLinkClass : navLinkClass}><CompassIcon /><p className="text-sm font-medium">ハムスター管理</p></NavLink>
+                    <NavLink to="/my-hamsters" className={({ isActive }) => isActive ? activeNavLinkClass : navLinkClass}><CompassIcon /><p className="text-sm font-medium">ハムスター管理</p></NavLink>
                     <NavLink to="/health-logs" className={({ isActive }) => isActive ? activeNavLinkClass : navLinkClass}><BookmarkIcon /><p className="text-sm font-medium">健康ログ</p></NavLink>
                     <NavLink to="/schedules" className={({ isActive }) => isActive ? activeNavLinkClass : navLinkClass}><CalendarIcon /><p className="text-sm font-medium">スケジュール</p></NavLink>
                     {currentUser && (

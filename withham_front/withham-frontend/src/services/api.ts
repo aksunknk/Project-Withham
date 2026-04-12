@@ -2,8 +2,17 @@
 
 import axios from 'axios';
 
-// APIのベースURLをエクスポート
-export const API_BASE_URL = 'http://127.0.0.1:8000';
+/** Vite: .env に VITE_API_BASE_URL を定義（末尾スラッシュ不要） */
+const rawBase = import.meta.env.VITE_API_BASE_URL?.trim() ?? '';
+export const API_BASE_URL = rawBase.replace(/\/$/, '') || 'http://127.0.0.1:8000';
+
+/** メディアパスが絶対URLのときはそのまま、相対のときは API オリジンを付与 */
+export function mediaUrl(path: string | null | undefined): string | null {
+  if (path == null || path === '') return null;
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  const p = path.startsWith('/') ? path : `/${path}`;
+  return `${API_BASE_URL}${p}`;
+}
 
 const api = axios.create({ baseURL: API_BASE_URL });
 

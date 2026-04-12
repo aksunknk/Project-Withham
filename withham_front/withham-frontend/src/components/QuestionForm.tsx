@@ -1,7 +1,6 @@
 // src/components/QuestionForm.tsx
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import type { Question } from '../types';
 
@@ -15,7 +14,6 @@ export function QuestionForm({ onSuccess, onCancel }: Props) {
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

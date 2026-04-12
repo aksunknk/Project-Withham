@@ -49,3 +49,15 @@ export const CalendarIcon = ({ className = "w-6 h-6" }: IconProps) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256" className={className}><path d="M208,32H184V24a8,8,0,0,0-16,0v8H88V24a8,8,0,0,0-16,0v8H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM48,48H72V56a8,8,0,0,0,16,0V48h80V56a8,8,0,0,0,16,0V48h24V80H48ZM208,208H48V96H208V208Z"></path></svg>
 );
 
+export const SparklesIcon = ({ className = "w-6 h-6" }: IconProps) => (
+    <svg className={className} fill="currentColor" viewBox="0 0 24 24" aria-hidden><path d="M12 2l1.91 6.5h6.8L14.9 13.5 17.5 20 12 16.25 6.5 20l2.6-6.5-5.81-5h6.8L12 2z"/></svg>
+);
+
+export const BellIcon = ({ className = "w-6 h-6" }: IconProps) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256" className={className}><path d="M221.8,175.94C216.25,166.38,208,139.33,208,104a80,80,0,1,0-160,0c0,35.34-8.26,62.38-13.81,71.94A16,16,0,0,0,48,200H88.81a40,40,0,0,0,78.38,0H208a16,16,0,0,0,13.8-24.06ZM128,216a24,24,0,0,1-22.62-16h45.24A24,24,0,0,1,128,216ZM48,184c10.07-19.62,24-50.65,24-80a64,64,0,1,1,128,0c0,29.35,13.93,60.38,24,80Z"/></svg>
+);
+
+export const PlusCircleIcon = ({ className = "w-6 h-6" }: IconProps) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256" className={className}><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm48-88a8,8,0,0,1-8,8H136v32a8,8,0,0,1-16,0V136H88a8,8,0,0,1,0-16h32V88a8,8,0,0,1,16,0v32h32A8,8,0,0,1,176,128Z"/></svg>
+);
+

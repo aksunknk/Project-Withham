@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_decode
 from django.utils.encoding import force_str
-from rest_framework import viewsets, permissions, generics, serializers, filters, status
+from rest_framework import viewsets, permissions, generics, serializers, filters, status, mixins
 from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -34,6 +34,7 @@ from .serializers import (
     QuestionDetailSerializer,
     AnswerSerializer,
     NotificationSerializer,
+    NotificationPartialUpdateSerializer,
     TagSerializer,
     TagDetailSerializer,
     ScheduleSerializer
@@ -155,8 +156,9 @@ class HamsterViewSet(viewsets.ModelViewSet):
 class HealthLogViewSet(viewsets.ModelViewSet):
     serializer_class = HealthLogSerializer
     permission_classes = [IsOwnerOfHamsterObject]
+
     def get_queryset(self):
-        return HealthLog.objects.filter(hamster__owner=self.request.user)
+        return HealthLog.objects.filter(hamster__owner=self.request.user).select_related('hamster')
     def perform_create(self, serializer):
         hamster = serializer.validated_data['hamster']
         if hamster.owner != self.request.user:
@@ -212,11 +214,17 @@ class AnswerViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
-    serializer_class = NotificationSerializer
+class NotificationViewSet(mixins.UpdateModelMixin, viewsets.ReadOnlyModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
+
     def get_queryset(self):
         return self.request.user.notifications.all().order_by('-timestamp')
+
+    def get_serializer_class(self):
+        if self.action in ('update', 'partial_update'):
+            return NotificationPartialUpdateSerializer
+        return NotificationSerializer
+
     @action(detail=False, methods=['post'])
     def mark_all_as_read(self, request):
         updated_count = request.user.notifications.filter(is_read=False).update(is_read=True)
@@ -253,8 +261,9 @@ class BookmarkedPostsViewSet(viewsets.ReadOnlyModelViewSet):
 class ScheduleViewSet(viewsets.ModelViewSet):
     serializer_class = ScheduleSerializer
     permission_classes = [IsOwnerOfHamsterObject]
+
     def get_queryset(self):
-        return Schedule.objects.filter(hamster__owner=self.request.user)
+        return Schedule.objects.filter(hamster__owner=self.request.user).select_related('hamster')
     def perform_create(self, serializer):
         hamster = serializer.validated_data['hamster']
         if hamster.owner != self.request.user:

@@ -30,7 +30,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('access_token', token);
         api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         const decoded = jwtDecode<DecodedToken>(token);
-        setCurrentUser({ id: decoded.user_id, username: decoded.username });
+        setCurrentUser({
+          id: decoded.user_id,
+          username: decoded.username,
+          profile: { avatar: null },
+        });
       } else {
         localStorage.removeItem('access_token');
         delete api.defaults.headers.common['Authorization'];

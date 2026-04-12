@@ -17,6 +17,11 @@ import { SearchPage } from './pages/SearchPage';
 import { QuestionListPage } from './pages/QuestionListPage';
 import { QuestionDetailPage } from './pages/QuestionDetailPage';
 import { QuestionFormPage } from './pages/QuestionFormPage';
+import { HealthLogsPage } from './pages/HealthLogsPage';
+import { SchedulesPage } from './pages/SchedulesPage';
+import { ExplorePage } from './pages/ExplorePage';
+import { NotificationsPage } from './pages/NotificationsPage';
+import { CreatePostPage } from './pages/CreatePostPage';
 
 function App() {
   console.log('=== App component rendering ===');
@@ -36,12 +41,13 @@ function App() {
               <Route path="/" element={<PostsPage />} />
               <Route path="/profile/:userId" element={<ProfilePage />} />
               <Route path="/my-hamsters" element={<MyHamstersPage />} />
+              <Route path="/health-logs" element={<HealthLogsPage />} />
+              <Route path="/schedules" element={<SchedulesPage />} />
               <Route path="/hamsters/:hamsterId" element={<HamsterDetailPage />} />
               <Route path="/posts/:postId" element={<PostDetailPage />} />
-              {/* 今後、ExploreやNotificationsなどのページをここに追加します */}
-              <Route path="/explore" element={<div>Explore Page</div>} />
-              <Route path="/notifications" element={<div>Notifications Page</div>} />
-              <Route path="/create" element={<div>Create Page</div>} />
+              <Route path="/explore" element={<ExplorePage />} />
+              <Route path="/notifications" element={<NotificationsPage />} />
+              <Route path="/create" element={<CreatePostPage />} />
               <Route path="/profile/:userId/followers" element={<FollowListPage />} />
               <Route path="/profile/:userId/following" element={<FollowListPage />} />
               <Route path="/search" element={<SearchPage />} />

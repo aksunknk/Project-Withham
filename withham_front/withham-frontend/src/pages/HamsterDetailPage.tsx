@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import api, { API_BASE_URL } from '../services/api';
+import api, { mediaUrl } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { HamsterDetail, HealthLog } from '../types';
 import { AddHealthLogForm } from '../components/AddHealthLogForm'; // フォームをインポート
@@ -77,7 +77,7 @@ export function HamsterDetailPage() {
         <div className="md:col-span-1 bg-white p-4 rounded-lg shadow">
             <h2 className="text-lg font-bold mb-2">プロフィール</h2>
             {hamster.profile_image && (
-                <img src={`${API_BASE_URL}${hamster.profile_image}`} alt={hamster.name} className="w-full h-auto rounded-lg mb-4 object-cover" />
+                <img src={mediaUrl(hamster.profile_image) ?? ''} alt={hamster.name} className="w-full h-auto rounded-lg mb-4 object-cover" />
             )}
             <p><strong>種類:</strong> {hamster.breed || '未設定'}</p>
             <p><strong>誕生日:</strong> {hamster.birthday || '未設定'}</p>
