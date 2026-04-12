@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 from pathlib import Path
 import os
 from datetime import timedelta
+from urllib.parse import quote_plus
 
 import dj_database_url
 
@@ -62,6 +63,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware', # ★CORSミドルウェアを追加
     'django.middleware.common.CommonMiddleware',
@@ -136,8 +138,19 @@ WSGI_APPLICATION = 'withham_project.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
-# DATABASE_URL が設定されていれば PostgreSQL 等（dj-database-url）、未設定なら SQLite
+# DATABASE_URL があれば優先。Render 等で DB_* だけ渡される場合は URL を組み立てる
 _database_url = os.environ.get("DATABASE_URL")
+if not _database_url:
+    db_name = os.environ.get("DB_NAME")
+    db_user = os.environ.get("DB_USER")
+    db_password = os.environ.get("DB_PASSWORD")
+    db_host = os.environ.get("DB_HOST")
+    db_port = os.environ.get("DB_PORT", "5432")
+    if all([db_name, db_user, db_password, db_host]):
+        _database_url = (
+            f"postgresql://{quote_plus(db_user)}:{quote_plus(db_password)}"
+            f"@{db_host}:{db_port}/{db_name}"
+        )
 if _database_url:
     DATABASES = {'default': dj_database_url.config(default=_database_url, conn_max_age=600)}
 else:
@@ -184,6 +197,18 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
 STATIC_URL = 'static/'
+# collectstatic および Render 等の本番ビルドで必須
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+if not DEBUG:
+    STORAGES = {
+        'default': {
+            'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        },
+        'staticfiles': {
+            'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage',
+        },
+    }
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field

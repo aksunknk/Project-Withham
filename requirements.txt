@@ -8,5 +8,6 @@ djangorestframework-simplejwt>=5.4,<6
 Pillow>=12.1.1,<13
 django-environ>=0.12,<1
 dj-database-url>=2.3,<3
+whitenoise>=6.9,<7
 gunicorn>=23,<24
 psycopg[binary]>=3.2,<4

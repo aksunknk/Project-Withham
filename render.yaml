@@ -1,23 +1,15 @@
-   services:
-     - type: web
-       name: withham
-       env: node
-       buildCommand: npm install && npm run build && python manage.py migrate --noinput
-       startCommand: npm start
-       envVars:
-         - key: NODE_ENV
-           value: production
-         - key: DB_NAME
-           value: hunu_beta
-         - key: DB_USER
-           value: hunu_beta_user
-         - key: DB_PASSWORD
-           value: cIQZUqqwcTBCQwMS2b7YyKsKvntY9QIC
-         - key: DB_HOST
-           value: dpg-d087bhs9c44c73bk65o0-a.singapore-postgres.render.com
-         - key: DB_PORT
-           value: 5432
-         - key: STATIC_URL
-           value: static/
-         - key: STATIC_ROOT
-           value: BASE_DIR / 'staticfiles'
+# Render 用（機密はダッシュボードの Environment に設定し、ここには載せないこと）
+services:
+  - type: web
+    name: withham
+    env: node
+    buildCommand: npm install && npm run build:css && pip install -r requirements.txt && python manage.py migrate --noinput && python manage.py collectstatic --noinput
+    startCommand: gunicorn withham_project.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DJANGO_DEBUG
+        value: "False"
+      # 以下は例: 実際の値は Render の Environment Variables で設定する
+      # DATABASE_URL または DB_NAME / DB_USER / DB_PASSWORD / DB_HOST / DB_PORT
+      # DJANGO_SECRET_KEY, DJANGO_ALLOWED_HOSTS, DJANGO_CORS_ORIGINS, VITE 側の URL など
