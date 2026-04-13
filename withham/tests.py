@@ -3,15 +3,15 @@
 from django.contrib.auth.models import User
 from rest_framework.test import APITestCase
 from rest_framework import status
+from rest_framework_simplejwt.tokens import RefreshToken
+
 
 class UserAuthAPITestCase(APITestCase):
-    """ユーザー登録とログインAPIのテストケース"""
+    """ユーザー登録とログインAPI"""
 
     def setUp(self):
-        """テストの前に実行される共通の準備"""
         self.register_url = '/api/register/'
         self.login_url = '/api/token/'
-        
         self.user_data = {
             'username': 'testuser',
             'email': 'test@example.com',
@@ -22,40 +22,28 @@ class UserAuthAPITestCase(APITestCase):
             'password2': 'StrongPassword123',
         }
 
-    # --- ユーザー登録のテスト ---
     def test_register_user_success(self):
-        """ユーザーが正常に登録できることをテストする"""
         response = self.client.post(self.register_url, self.register_payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(User.objects.count(), 1)
         self.assertEqual(User.objects.get().username, 'testuser')
-        print("✅ test_register_user_success: Passed")
 
     def test_register_user_password_mismatch(self):
-        """パスワードが一致しない場合にエラーになることをテストする"""
         payload = self.register_payload.copy()
         payload['password2'] = 'WrongPassword'
         response = self.client.post(self.register_url, payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        # ★★★ 検証方法を修正 ★★★
-        # レスポンスの 'detail' キーの値に 'password' という文字列が含まれているか確認
         self.assertIn('password', response.data['detail'])
-        print("✅ test_register_user_password_mismatch: Passed")
 
     def test_register_user_duplicate_username(self):
-        """同じユーザー名で登録しようとするとエラーになることをテストする"""
-        self.client.post(self.register_url, self.register_payload, format='json') # 最初の登録
-        response = self.client.post(self.register_url, self.register_payload, format='json') # 2回目の登録
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        # ★★★ 検証方法を修正 ★★★
-        # レスポンスの 'detail' キーの値に 'username' という文字列が含まれているか確認
-        self.assertIn('username', response.data['detail'])
-        print("✅ test_register_user_duplicate_username: Passed")
-        
-    # --- ログインのテスト ---
-    def test_login_user_success(self):
-        """登録済みのユーザーが正常にログインできることをテストする"""
         self.client.post(self.register_url, self.register_payload, format='json')
+        response = self.client.post(self.register_url, self.register_payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('username', response.data['detail'])
+
+    def test_login_user_success(self):
+        self.client.post(self.register_url, self.register_payload, format='json')
+        User.objects.filter(username=self.user_data['username']).update(is_active=True)
         login_payload = {
             'username': self.user_data['username'],
             'password': self.user_data['password'],
@@ -64,16 +52,54 @@ class UserAuthAPITestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('access', response.data)
         self.assertIn('refresh', response.data)
-        print("✅ test_login_user_success: Passed")
 
     def test_login_user_wrong_password(self):
-        """間違ったパスワードでログインしようとするとエラーになることをテストする"""
         self.client.post(self.register_url, self.register_payload, format='json')
+        User.objects.filter(username=self.user_data['username']).update(is_active=True)
         login_payload = {
             'username': self.user_data['username'],
             'password': 'WrongPassword',
         }
         response = self.client.post(self.login_url, login_payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-        print("✅ test_login_user_wrong_password: Passed")
 
+
+class PostAPITestCase(APITestCase):
+    """投稿一覧・作成（JWT）"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='poster', email='p@example.com', password='StrongPassword123'
+        )
+        refresh = RefreshToken.for_user(self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+
+    def test_posts_list_authenticated_returns_200(self):
+        response = self.client.get('/api/posts/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsInstance(response.data, list)
+
+    def test_create_post_json(self):
+        response = self.client.post(
+            '/api/posts/',
+            {'text': 'hello #test'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['author']['username'], 'poster')
+
+
+class TrendingTagsAPITestCase(APITestCase):
+    """トレンドタグ（要認証）"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='taguser', email='t@example.com', password='StrongPassword123'
+        )
+        refresh = RefreshToken.for_user(self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+
+    def test_trending_tags_returns_200(self):
+        response = self.client.get('/api/tags/trending/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsInstance(response.data, list)
