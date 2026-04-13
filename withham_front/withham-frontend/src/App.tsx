@@ -1,82 +1,31 @@
-// src/App.tsx
+// Withham 2 向け UI アーカイブ用の最小シェル（本番アプリでは差し替え）
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import { Layout } from './components/Layout';
 
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { LoginPage } from './pages/LoginPage';
-import { SignupPage } from './pages/SignupPage';
-import { AccountActivationPage } from './pages/AccountActivationPage';
-import { PostsPage } from './pages/PostsPage';
-import { ProfilePage } from './pages/ProfilePage';
-import { MyHamstersPage } from './pages/MyHamstersPage';
-import { HamsterDetailPage } from './pages/HamsterDetailPage';
-import { PostDetailPage } from './pages/PostDetailPage';
-import { Layout } from './components/Layout'; // Layoutをインポート
-import { ProtectedRoute } from './components/ProtectedRoute';
-import { FollowListPage } from './pages/FollowListPage';
-import { SearchPage } from './pages/SearchPage';
-import { QuestionListPage } from './pages/QuestionListPage';
-import { QuestionDetailPage } from './pages/QuestionDetailPage';
-import { QuestionFormPage } from './pages/QuestionFormPage';
-import { HealthLogsPage } from './pages/HealthLogsPage';
-import { SchedulesPage } from './pages/SchedulesPage';
-import { ExplorePage } from './pages/ExplorePage';
-import { NotificationsPage } from './pages/NotificationsPage';
-import { CreatePostPage } from './pages/CreatePostPage';
+function UiArchivePlaceholder() {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-6 text-text-main">
+      <p className="font-semibold">withham v1 UI アーカイブ</p>
+      <p className="mt-2 text-sm text-text-sub">
+        左ナビ・右サイドバー・テーマ（Tailwind）は <code className="text-primary">src/components</code> および{' '}
+        <code className="text-primary">tailwind.config.js</code> を参照してください。
+      </p>
+    </div>
+  );
+}
 
-function App() {
-  console.log('=== App component rendering ===');
-  
+export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* 公開ルート */}
-          <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
-          <Route path="/signup" element={<SignupPage />} />
-          <Route path="/activate/:uidb64/:token" element={<AccountActivationPage />} />
-
-          {/* 保護されたルート */}
-          <Route element={<ProtectedRoute />}>
           <Route element={<Layout />}>
-              <Route path="/" element={<PostsPage />} />
-              <Route path="/profile/:userId" element={<ProfilePage />} />
-              <Route path="/my-hamsters" element={<MyHamstersPage />} />
-              <Route path="/health-logs" element={<HealthLogsPage />} />
-              <Route path="/schedules" element={<SchedulesPage />} />
-              <Route path="/hamsters/:hamsterId" element={<HamsterDetailPage />} />
-              <Route path="/posts/:postId" element={<PostDetailPage />} />
-              <Route path="/explore" element={<ExplorePage />} />
-              <Route path="/notifications" element={<NotificationsPage />} />
-              <Route path="/create" element={<CreatePostPage />} />
-              <Route path="/profile/:userId/followers" element={<FollowListPage />} />
-              <Route path="/profile/:userId/following" element={<FollowListPage />} />
-              <Route path="/search" element={<SearchPage />} />
-              <Route path="/qa" element={<QuestionListPage />} />
-              <Route path="/questions/:questionId" element={<QuestionDetailPage />} />
-              <Route path="/questions/new" element={<QuestionFormPage />} />
-            </Route>
+            <Route path="/" element={<UiArchivePlaceholder />} />
+            <Route path="*" element={<UiArchivePlaceholder />} />
           </Route>
-          {/* 未定義のURLはルートにリダイレクト */}
-          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
   );
 }
-
-// GuestRouteコンポーネントを追加
-function GuestRoute({ children }: { children: React.ReactNode }) {
-  const { token } = useAuth();
-  console.log('=== GuestRoute rendering ===');
-  console.log('token:', token ? 'exists' : 'null');
-  
-  if (token) {
-    console.log('User is authenticated, redirecting to home');
-    return <Navigate to="/" replace />;
-  }
-  
-  console.log('User is not authenticated, showing login page');
-  return <>{children}</>;
-}
-
-export default App;

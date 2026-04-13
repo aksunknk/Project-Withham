@@ -1,31 +1,6 @@
-.env
-.env.local
-*.local
-
-# Python
 .venv/
-venv/
-__pycache__/
-*.py[cod]
-*.egg-info/
-.eggs/
-
-# Node
 node_modules/
 dist/
-
-# Django
-media/
-staticfiles/
-db.sqlite3
-*.sqlite3
-
-# ローカルアップロード（リポジトリに含めない）
-avatars/
-
-# IDE
-.idea/
-.vscode/
-*.swp
-
-.DS_Store
+.env
+.env.local
+*.log

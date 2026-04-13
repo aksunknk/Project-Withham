@@ -1,1 +1,0 @@
-web: gunicorn withham_project.wsgi:application
