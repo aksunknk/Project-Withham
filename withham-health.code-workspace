@@ -1,0 +1,15 @@
+{
+  "folders": [
+    {
+      "name": "withham-health",
+      "path": "withham-health"
+    },
+    {
+      "name": "withham-front",
+      "path": "withham_front"
+    }
+  ],
+  "settings": {
+    "terminal.integrated.cwd": "${workspaceFolder:withham-health}"
+  }
+}

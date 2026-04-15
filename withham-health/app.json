@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Withham-v2",
+    "slug": "withham-health",
+    "platforms": [
+      "android"
+    ],
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "android": {
+      "package": "com.local.withham",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "plugins": [
+      "expo-sqlite",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "ペットのアイコンに使う写真へのアクセスを許可します。"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b184ffb6-1534-415d-bda5-771e3b939742"
+      }
+    },
+    "owner": "aksunk"
+  }
+}
