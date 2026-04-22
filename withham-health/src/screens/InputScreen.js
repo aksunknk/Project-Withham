@@ -1,26 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
-  Platform,
   ScrollView,
-  StatusBar as RNStatusBar,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { copyAsync, documentDirectory } from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { StatusBar } from 'expo-status-bar';
 import { getSetting, SETTINGS_KEYS, setSetting } from '../database/db';
-import { PetHeader } from './PetHeader';
-import { PetObservationCard } from './PetObservationCard';
+import { MaintenanceSection } from '../components/MaintenanceSection';
+import { PetHeader } from '../components/PetHeader';
+import { PetObservationCard } from '../components/PetObservationCard';
 
 const BG = '#FDFBF7';
 const FG = '#4A4A4A';
 const H_PAD = 20;
 
-export function WithhamHomeScreen() {
+export function InputScreen() {
+  const insets = useSafeAreaInsets();
   const { width: winW } = useWindowDimensions();
   const pagerRef = useRef(null);
   const petRef = useRef('funu');
@@ -126,8 +127,7 @@ export function WithhamHomeScreen() {
     }
   }, []);
 
-  const padTop =
-    Platform.OS === 'android' ? (RNStatusBar.currentHeight ?? 0) + 8 : 52;
+  const padTop = Math.max(insets.top, 8);
 
   return (
     <View style={[styles.screen, { paddingTop: padTop }]}>
@@ -177,6 +177,10 @@ export function WithhamHomeScreen() {
             </View>
           </View>
         </ScrollView>
+
+        <View style={styles.padded}>
+          <MaintenanceSection />
+        </View>
       </ScrollView>
     </View>
   );
@@ -188,7 +192,7 @@ const styles = StyleSheet.create({
     backgroundColor: BG,
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 24,
   },
   padded: {
     paddingHorizontal: H_PAD,
@@ -199,15 +203,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     color: FG,
     marginBottom: 12,
-    ...Platform.select({
-      ios: {
-        fontFamily: 'Georgia',
-      },
-      android: {
-        fontFamily: 'serif',
-        includeFontPadding: false,
-      },
-    }),
+    fontFamily: 'serif',
+    includeFontPadding: false,
   },
   swipeHint: {
     fontSize: 12,

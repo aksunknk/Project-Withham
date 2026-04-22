@@ -4,7 +4,6 @@ import {
   Modal,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -18,7 +17,6 @@ import {
   getHeyanpoHistory,
   getLocalDateString,
   getTodayLog,
-  getWeightHistory,
   mergeUpsertDailyLog,
 } from '../database/db';
 import { WeightSection } from './WeightSection';
@@ -28,6 +26,10 @@ const CARD = '#F5EFE6';
 const FG = '#4A4A4A';
 const R = 22;
 const R_IN = 20;
+const SEAL_ON = '#D8CEC2';
+const SEAL_OFF = '#FDFBF7';
+const HEYANPO_IDLE = '#FDFBF7';
+const HEYANPO_ACTIVE = '#EDE6DC';
 
 function timeStrToDate(s) {
   const d = new Date();
@@ -65,11 +67,10 @@ export function PetObservationCard({ petId }) {
   const [weightText, setWeightText] = useState('');
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
-  const [gapChecked, setGapChecked] = useState(false);
+  const [sealed, setSealed] = useState(false);
   const [mealId, setMealId] = useState(null);
   const [memoText, setMemoText] = useState('');
   const [meals, setMeals] = useState([]);
-  const [history, setHistory] = useState([]);
   const [showStart, setShowStart] = useState(false);
   const [showEnd, setShowEnd] = useState(false);
   const [mealModal, setMealModal] = useState(false);
@@ -84,14 +85,12 @@ export function PetObservationCard({ petId }) {
   const recordDateStr = getLocalDateString();
 
   const load = useCallback(async () => {
-    const [row, ml, hist, hyHist] = await Promise.all([
+    const [row, ml, hyHist] = await Promise.all([
       getTodayLog(petId),
       getCustomMeals(),
-      getWeightHistory(petId, 14),
       getHeyanpoHistory(petId, 60),
     ]);
     setMeals(ml);
-    setHistory(hist);
     setHeyanpoHistory(hyHist);
     if (row) {
       setWeightText(row.weight != null ? String(row.weight) : '');
@@ -101,14 +100,18 @@ export function PetObservationCard({ petId }) {
         hs != null && String(hs).trim() ? timeStrToDate(hs) : null
       );
       setEndDate(he != null && String(he).trim() ? timeStrToDate(he) : null);
-      setGapChecked(row.gap_block_checked === 1);
+      const gapOn = row.gap_block_checked === 1;
+      const doorRaw = row.door_lock_checked;
+      const doorOn =
+        doorRaw === undefined || doorRaw === null ? gapOn : doorRaw === 1;
+      setSealed(gapOn && doorOn);
       setMealId(row.meal_id != null ? Number(row.meal_id) : null);
       setMemoText(row.memo ?? '');
     } else {
       setWeightText('');
       setStartDate(null);
       setEndDate(null);
-      setGapChecked(false);
+      setSealed(false);
       setMealId(null);
       setMemoText('');
     }
@@ -124,8 +127,6 @@ export function PetObservationCard({ petId }) {
       await mergeUpsertDailyLog(petId, {
         weight: parseWeightInput(weightText),
       });
-      const hist = await getWeightHistory(petId, 14);
-      setHistory(hist);
       setWeightText('');
       Alert.alert(
         '保存しました',
@@ -147,10 +148,11 @@ export function PetObservationCard({ petId }) {
       };
       if (endDate != null) {
         partial.gap_block_checked = 0;
+        partial.door_lock_checked = 0;
       }
       await mergeUpsertDailyLog(petId, partial);
       if (endDate != null) {
-        setGapChecked(false);
+        setSealed(false);
       }
       const hyHist = await getHeyanpoHistory(petId, 60);
       setHeyanpoHistory(hyHist);
@@ -164,19 +166,32 @@ export function PetObservationCard({ petId }) {
     }
   }, [petId, startDate, endDate]);
 
-  const onGapChange = useCallback(
-    async (v) => {
-      const prev = gapChecked;
-      setGapChecked(v);
-      try {
-        await mergeUpsertDailyLog(petId, { gap_block_checked: v ? 1 : 0 });
-      } catch (e) {
-        setGapChecked(prev);
-        Alert.alert('保存エラー', String(e?.message ?? e));
-      }
-    },
-    [petId, gapChecked]
-  );
+  const onSealedToggle = useCallback(async () => {
+    const prev = sealed;
+    const next = !sealed;
+    setSealed(next);
+    try {
+      await mergeUpsertDailyLog(petId, {
+        gap_block_checked: next ? 1 : 0,
+        door_lock_checked: next ? 1 : 0,
+      });
+    } catch (e) {
+      setSealed(prev);
+      Alert.alert('保存エラー', String(e?.message ?? e));
+    }
+  }, [petId, sealed]);
+
+  const onHeyanpoMegaTap = useCallback(() => {
+    const now = new Date();
+    if (startDate == null || (startDate != null && endDate != null)) {
+      setStartDate(now);
+      setEndDate(null);
+      return;
+    }
+    if (startDate != null && endDate == null) {
+      setEndDate(now);
+    }
+  }, [startDate, endDate]);
 
   const saveMeal = useCallback(async () => {
     setSavingMeal(true);
@@ -233,37 +248,75 @@ export function PetObservationCard({ petId }) {
 
   const pickerVal = mealId == null ? '' : String(mealId);
 
-  const latestRecord =
-    history.length > 0 ? history[history.length - 1] : null;
+  const heyanpoPhaseLabel =
+    startDate == null || (startDate != null && endDate != null)
+      ? 'タップで開始時刻を記録'
+      : '進行中 · タップで終了時刻を記録';
+
+  const heyanpoDetail =
+    startDate == null && endDate == null
+      ? 'ストップウォッチ形式で本日のへやんぽを記録します。'
+      : `開始 ${dateToTimeLabel(startDate)} ／ 終了 ${dateToTimeLabel(endDate)}`;
 
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>{petId === 'funu' ? 'ふぬ' : 'むむ'}</Text>
       <Text style={styles.cardSub}>
-        項目ごとに保存できます。隙間遮断は切り替えと同時に保存されます。
+        各ブロックの「保存」で確定します。安全確認はタップと同時に保存されます。
       </Text>
 
       <WeightSection
         weightText={weightText}
         onChangeWeight={setWeightText}
-        historyRows={history}
-        latestRecord={latestRecord}
         recordDateStr={recordDateStr}
         onSaveWeight={saveWeight}
         savingWeight={savingWeight}
       />
 
+      <Text style={styles.sectionTitle}>安全確認（隙間・戸締まり）</Text>
+      <TouchableOpacity
+        style={[
+          styles.sealMega,
+          { backgroundColor: sealed ? SEAL_ON : SEAL_OFF },
+        ]}
+        onPress={onSealedToggle}
+        activeOpacity={0.92}
+      >
+        <Text style={styles.sealMegaTitle}>
+          {sealed ? '安全確保' : '開放中'}
+        </Text>
+        <Text style={styles.sealMegaSub}>
+          {sealed
+            ? '隙間と戸締まりの安全を確認しました'
+            : '隙間・出入口の状態を確認のうえ、タップで安全確保に切り替えてください'}
+        </Text>
+      </TouchableOpacity>
+
       <Text style={styles.sectionTitle}>へやんぽ（室内散歩）</Text>
-      <View style={styles.timeRow}>
-        <Text style={styles.timeLbl}>開始</Text>
-        <TouchableOpacity
-          style={styles.timeBtn}
-          onPress={() => setShowStart(true)}
-          activeOpacity={0.88}
-        >
-          <Text style={styles.timeBtnText}>{dateToTimeLabel(startDate)}</Text>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity
+        style={[
+          styles.heyanpoMega,
+          {
+            backgroundColor:
+              startDate != null && endDate == null
+                ? HEYANPO_ACTIVE
+                : HEYANPO_IDLE,
+          },
+        ]}
+        onPress={onHeyanpoMegaTap}
+        activeOpacity={0.9}
+      >
+        <Text style={styles.heyanpoMegaPhase}>{heyanpoPhaseLabel}</Text>
+        <Text style={styles.heyanpoMegaDetail}>{heyanpoDetail}</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.manualLink}
+        onPress={() => setShowStart(true)}
+        activeOpacity={0.88}
+      >
+        <Text style={styles.manualLinkText}>開始時刻を手動で調整</Text>
+      </TouchableOpacity>
       {showStart && (
         <DateTimePicker
           value={startDate ?? timeStrToDate(null)}
@@ -277,16 +330,13 @@ export function PetObservationCard({ petId }) {
         />
       )}
 
-      <View style={styles.timeRow}>
-        <Text style={styles.timeLbl}>終了</Text>
-        <TouchableOpacity
-          style={styles.timeBtn}
-          onPress={() => setShowEnd(true)}
-          activeOpacity={0.88}
-        >
-          <Text style={styles.timeBtnText}>{dateToTimeLabel(endDate)}</Text>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity
+        style={styles.manualLink}
+        onPress={() => setShowEnd(true)}
+        activeOpacity={0.88}
+      >
+        <Text style={styles.manualLinkText}>終了時刻を手動で調整</Text>
+      </TouchableOpacity>
       {showEnd && (
         <DateTimePicker
           value={endDate ?? timeStrToDate(null)}
@@ -355,16 +405,6 @@ export function PetObservationCard({ petId }) {
           </View>
         </View>
       </Modal>
-
-      <View style={styles.gapRow}>
-        <Text style={styles.sectionTitle}>隙間遮断</Text>
-        <Switch
-          value={gapChecked}
-          onValueChange={onGapChange}
-          trackColor={{ false: '#D4C9BC', true: '#B8A99A' }}
-          thumbColor={gapChecked ? '#FDFBF7' : '#f4f3f4'}
-        />
-      </View>
 
       <Text style={styles.sectionTitle}>食事メニュー</Text>
       <View style={styles.pickerOuter}>
@@ -479,29 +519,51 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 8,
   },
-  timeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-    gap: 12,
+  sealMega: {
+    borderRadius: 22,
+    paddingVertical: 22,
+    paddingHorizontal: 18,
+    marginBottom: 12,
   },
-  timeLbl: {
-    width: 44,
+  sealMegaTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: FG,
+    marginBottom: 8,
+  },
+  sealMegaSub: {
     fontSize: 14,
     color: FG,
-    opacity: 0.85,
+    opacity: 0.82,
+    lineHeight: 20,
   },
-  timeBtn: {
-    flex: 1,
-    backgroundColor: BG,
-    borderRadius: R_IN,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+  heyanpoMega: {
+    borderRadius: 22,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    marginBottom: 8,
   },
-  timeBtnText: {
-    fontSize: 16,
+  heyanpoMegaPhase: {
+    fontSize: 17,
+    fontWeight: '700',
     color: FG,
-    fontWeight: '600',
+    marginBottom: 8,
+  },
+  heyanpoMegaDetail: {
+    fontSize: 15,
+    color: FG,
+    opacity: 0.88,
+  },
+  manualLink: {
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
+    marginBottom: 4,
+  },
+  manualLinkText: {
+    fontSize: 14,
+    color: FG,
+    textDecorationLine: 'underline',
+    opacity: 0.88,
   },
   sectionSave: {
     alignSelf: 'flex-start',
@@ -559,13 +621,6 @@ const styles = StyleSheet.create({
   },
   historyModalClose: {
     alignSelf: 'flex-end',
-  },
-  gapRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 8,
-    marginBottom: 8,
   },
   pickerOuter: {
     backgroundColor: BG,

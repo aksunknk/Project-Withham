@@ -6,11 +6,49 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
-import { WithhamHomeScreen } from './src/components/WithhamHomeScreen';
+import { InputScreen } from './src/screens/InputScreen';
+import { InsightsScreen } from './src/screens/InsightsScreen';
 import { initDB } from './src/database/db';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+const Tab = createBottomTabNavigator();
+
+function MainTabs() {
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: '#4A4A4A',
+        tabBarInactiveTintColor: 'rgba(74,74,74,0.45)',
+        tabBarStyle: {
+          backgroundColor: '#F5EFE6',
+          borderTopColor: '#D4C9BC',
+          borderTopWidth: StyleSheet.hairlineWidth,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
+        },
+      }}
+    >
+      <Tab.Screen
+        name="Input"
+        component={InputScreen}
+        options={{ tabBarLabel: '記録' }}
+      />
+      <Tab.Screen
+        name="Insights"
+        component={InsightsScreen}
+        options={{ tabBarLabel: '分析' }}
+      />
+    </Tab.Navigator>
+  );
+}
 
 function rejectAfter(ms, message) {
   return new Promise((_, reject) => {
@@ -81,7 +119,13 @@ export default function App() {
     );
   }
 
-  return <WithhamHomeScreen />;
+  return (
+    <SafeAreaProvider>
+      <NavigationContainer>
+        <MainTabs />
+      </NavigationContainer>
+    </SafeAreaProvider>
+  );
 }
 
 const styles = StyleSheet.create({
