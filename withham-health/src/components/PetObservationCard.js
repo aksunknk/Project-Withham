@@ -16,8 +16,10 @@ import {
   getCustomMeals,
   getHeyanpoHistory,
   getLocalDateString,
-  getTodayLog,
+  getLogByDate,
+  getPreviousWeight,
   mergeUpsertDailyLog,
+  parseLocalDateString,
 } from '../database/db';
 import { WeightSection } from './WeightSection';
 
@@ -64,7 +66,10 @@ function parseWeightInput(text) {
 }
 
 export function PetObservationCard({ petId }) {
+  const [recordDateStr, setRecordDateStr] = useState(getLocalDateString());
+  const [showRecordDate, setShowRecordDate] = useState(false);
   const [weightText, setWeightText] = useState('');
+  const [previousWeight, setPreviousWeight] = useState(null);
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
   const [sealed, setSealed] = useState(false);
@@ -82,16 +87,16 @@ export function PetObservationCard({ petId }) {
   const [savingMeal, setSavingMeal] = useState(false);
   const [savingMemo, setSavingMemo] = useState(false);
 
-  const recordDateStr = getLocalDateString();
-
   const load = useCallback(async () => {
-    const [row, ml, hyHist] = await Promise.all([
-      getTodayLog(petId),
+    const [row, ml, hyHist, prevW] = await Promise.all([
+      getLogByDate(petId, recordDateStr),
       getCustomMeals(),
       getHeyanpoHistory(petId, 60),
+      getPreviousWeight(petId, recordDateStr),
     ]);
     setMeals(ml);
     setHeyanpoHistory(hyHist);
+    setPreviousWeight(prevW);
     if (row) {
       setWeightText(row.weight != null ? String(row.weight) : '');
       const hs = row.heyanpo_start;
@@ -115,7 +120,7 @@ export function PetObservationCard({ petId }) {
       setMealId(null);
       setMemoText('');
     }
-  }, [petId]);
+  }, [petId, recordDateStr]);
 
   useEffect(() => {
     load().catch((e) => console.error('[PetObservationCard load]', e));
@@ -124,25 +129,52 @@ export function PetObservationCard({ petId }) {
   const saveWeight = useCallback(async () => {
     setSavingWeight(true);
     try {
+      const before = await getLogByDate(petId, recordDateStr);
+      const prevWeight = before?.weight != null ? Number(before.weight) : null;
+      const nextWeight = parseWeightInput(weightText);
       await mergeUpsertDailyLog(petId, {
-        weight: parseWeightInput(weightText),
+        date: recordDateStr,
+        weight: nextWeight,
       });
-      setWeightText('');
+      setWeightText(nextWeight != null ? String(nextWeight) : '');
+      setPreviousWeight(await getPreviousWeight(petId, recordDateStr));
       Alert.alert(
         '保存しました',
-        `体重を記録しました。\n記録日（自動）: ${getLocalDateString()}`
+        `体重を記録しました。\n記録日: ${recordDateStr}`,
+        [
+          {
+            text: 'アンドゥ',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await mergeUpsertDailyLog(petId, {
+                  date: recordDateStr,
+                  weight: prevWeight,
+                });
+                await load();
+              } catch (e) {
+                Alert.alert('アンドゥ失敗', String(e?.message ?? e));
+              }
+            },
+          },
+          { text: 'OK' },
+        ]
       );
     } catch (e) {
       Alert.alert('保存エラー', String(e?.message ?? e));
     } finally {
       setSavingWeight(false);
     }
-  }, [petId, weightText]);
+  }, [petId, weightText, recordDateStr, load]);
 
   const saveHeyanpo = useCallback(async () => {
     setSavingHeyanpo(true);
     try {
+      const before = await getLogByDate(petId, recordDateStr);
+      const prevStart = before?.heyanpo_start ?? null;
+      const prevEnd = before?.heyanpo_end ?? null;
       const partial = {
+        date: recordDateStr,
         heyanpo_start: dateToTimeDb(startDate),
         heyanpo_end: dateToTimeDb(endDate),
       };
@@ -156,15 +188,31 @@ export function PetObservationCard({ petId }) {
       }
       const hyHist = await getHeyanpoHistory(petId, 60);
       setHeyanpoHistory(hyHist);
-      setStartDate(null);
-      setEndDate(null);
-      Alert.alert('保存しました', 'へやんぽの時刻を保存しました。');
+      Alert.alert('保存しました', `へやんぽを保存しました。\n記録日: ${recordDateStr}`, [
+        {
+          text: 'アンドゥ',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await mergeUpsertDailyLog(petId, {
+                date: recordDateStr,
+                heyanpo_start: prevStart,
+                heyanpo_end: prevEnd,
+              });
+              await load();
+            } catch (e) {
+              Alert.alert('アンドゥ失敗', String(e?.message ?? e));
+            }
+          },
+        },
+        { text: 'OK' },
+      ]);
     } catch (e) {
       Alert.alert('保存エラー', String(e?.message ?? e));
     } finally {
       setSavingHeyanpo(false);
     }
-  }, [petId, startDate, endDate]);
+  }, [petId, startDate, endDate, recordDateStr, load]);
 
   const onSealedToggle = useCallback(async () => {
     const prev = sealed;
@@ -172,6 +220,7 @@ export function PetObservationCard({ petId }) {
     setSealed(next);
     try {
       await mergeUpsertDailyLog(petId, {
+        date: recordDateStr,
         gap_block_checked: next ? 1 : 0,
         door_lock_checked: next ? 1 : 0,
       });
@@ -179,7 +228,7 @@ export function PetObservationCard({ petId }) {
       setSealed(prev);
       Alert.alert('保存エラー', String(e?.message ?? e));
     }
-  }, [petId, sealed]);
+  }, [petId, sealed, recordDateStr]);
 
   const onHeyanpoMegaTap = useCallback(() => {
     const now = new Date();
@@ -196,7 +245,7 @@ export function PetObservationCard({ petId }) {
   const saveMeal = useCallback(async () => {
     setSavingMeal(true);
     try {
-      await mergeUpsertDailyLog(petId, { meal_id: mealId });
+      await mergeUpsertDailyLog(petId, { date: recordDateStr, meal_id: mealId });
       await load();
       Alert.alert('保存しました', '食事メニューを保存しました。');
     } catch (e) {
@@ -204,22 +253,42 @@ export function PetObservationCard({ petId }) {
     } finally {
       setSavingMeal(false);
     }
-  }, [petId, mealId, load]);
+  }, [petId, mealId, load, recordDateStr]);
 
   const saveMemo = useCallback(async () => {
     setSavingMemo(true);
     try {
+      const before = await getLogByDate(petId, recordDateStr);
+      const prevMemo = before?.memo ?? null;
       await mergeUpsertDailyLog(petId, {
+        date: recordDateStr,
         memo: memoText.trim() || null,
       });
       await load();
-      Alert.alert('保存しました', 'メモを保存しました。');
+      Alert.alert('保存しました', `メモを保存しました。\n記録日: ${recordDateStr}`, [
+        {
+          text: 'アンドゥ',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await mergeUpsertDailyLog(petId, {
+                date: recordDateStr,
+                memo: prevMemo,
+              });
+              await load();
+            } catch (e) {
+              Alert.alert('アンドゥ失敗', String(e?.message ?? e));
+            }
+          },
+        },
+        { text: 'OK' },
+      ]);
     } catch (e) {
       Alert.alert('保存エラー', String(e?.message ?? e));
     } finally {
       setSavingMemo(false);
     }
-  }, [petId, memoText, load]);
+  }, [petId, memoText, load, recordDateStr]);
 
   const onPickerChange = (v) => {
     if (v === '__add__') {
@@ -238,7 +307,7 @@ export function PetObservationCard({ petId }) {
       setMealId(id);
       setMealModal(false);
       setNewMealName('');
-      await mergeUpsertDailyLog(petId, { meal_id: id });
+      await mergeUpsertDailyLog(petId, { date: recordDateStr, meal_id: id });
       await load();
       Alert.alert('保存しました', 'メニューを追加し、選択状態を保存しました。');
     } catch (e) {
@@ -247,6 +316,7 @@ export function PetObservationCard({ petId }) {
   };
 
   const pickerVal = mealId == null ? '' : String(mealId);
+  const isToday = recordDateStr === getLocalDateString();
 
   const heyanpoPhaseLabel =
     startDate == null || (startDate != null && endDate != null)
@@ -255,23 +325,39 @@ export function PetObservationCard({ petId }) {
 
   const heyanpoDetail =
     startDate == null && endDate == null
-      ? 'ストップウォッチ形式で本日のへやんぽを記録します。'
+      ? isToday
+        ? 'ストップウォッチ形式で本日のへやんぽを記録します。'
+        : `ストップウォッチ形式で ${recordDateStr} のへやんぽを記録します。`
       : `開始 ${dateToTimeLabel(startDate)} ／ 終了 ${dateToTimeLabel(endDate)}`;
 
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>{petId === 'funu' ? 'ふぬ' : 'むむ'}</Text>
       <Text style={styles.cardSub}>
-        各ブロックの「保存」で確定します。安全確認はタップと同時に保存されます。
+        各ブロックの「保存」で確定します。安全確認はタップと同時に保存されます。記録日を変えれば過去分も入力できます。
       </Text>
 
       <WeightSection
         weightText={weightText}
         onChangeWeight={setWeightText}
         recordDateStr={recordDateStr}
+        onPressRecordDate={() => setShowRecordDate(true)}
         onSaveWeight={saveWeight}
         savingWeight={savingWeight}
+        previousWeight={previousWeight}
       />
+      {showRecordDate && (
+        <DateTimePicker
+          value={parseLocalDateString(recordDateStr)}
+          mode="date"
+          display="default"
+          maximumDate={new Date()}
+          onChange={(_, date) => {
+            setShowRecordDate(false);
+            if (date) setRecordDateStr(getLocalDateString(date));
+          }}
+        />
+      )}
 
       <Text style={styles.sectionTitle}>安全確認（隙間・戸締まり）</Text>
       <TouchableOpacity

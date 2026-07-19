@@ -12,6 +12,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import { InputScreen } from './src/screens/InputScreen';
 import { InsightsScreen } from './src/screens/InsightsScreen';
+import { SettingsScreen } from './src/screens/SettingsScreen';
 import { initDB } from './src/database/db';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -45,6 +46,11 @@ function MainTabs() {
         name="Insights"
         component={InsightsScreen}
         options={{ tabBarLabel: '分析' }}
+      />
+      <Tab.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{ tabBarLabel: 'データ' }}
       />
     </Tab.Navigator>
   );

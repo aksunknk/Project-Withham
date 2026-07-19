@@ -153,10 +153,28 @@ export function getDatabase() {
   return dbSingleton;
 }
 
-/** @param {'funu'|'mumu'} pet_id */
-export async function getTodayLog(pet_id) {
+/** YYYY-MM-DD 形式か */
+export function isValidDateString(s) {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const [y, m, d] = s.split('-').map((x) => Number(x));
+  const dt = new Date(y, m - 1, d);
+  return (
+    dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d
+  );
+}
+
+/** @param {string} dateStr YYYY-MM-DD */
+export function parseLocalDateString(dateStr) {
+  const [y, m, d] = String(dateStr).split('-').map((x) => Number(x));
+  return new Date(y, m - 1, d);
+}
+
+/**
+ * @param {'funu'|'mumu'} pet_id
+ * @param {string} date YYYY-MM-DD
+ */
+export async function getLogByDate(pet_id, date) {
   const db = getDatabase();
-  const date = getLocalDateString();
   const row = await db.getFirstAsync(
     `SELECT id, date, pet_id, weight, heyanpo_start, heyanpo_end,
             gap_block_checked, door_lock_checked, meal_id, memo
@@ -164,6 +182,11 @@ export async function getTodayLog(pet_id) {
     [date, pet_id]
   );
   return row ?? null;
+}
+
+/** @param {'funu'|'mumu'} pet_id */
+export async function getTodayLog(pet_id) {
+  return getLogByDate(pet_id, getLocalDateString());
 }
 
 /**
@@ -246,15 +269,104 @@ function existingRowToPayload(row) {
 }
 
 /**
- * 本日行の既存値とマージして UPSERT（項目単位の保存用）
+ * 指定日（未指定なら本日）の既存値とマージして UPSERT（項目単位の保存用）
  * @param {'funu'|'mumu'} pet_id
- * @param {object} partial upsertDailyLog と同形の部分オブジェクト
+ * @param {object} partial upsertDailyLog と同形。`date` で対象日を指定可
  */
 export async function mergeUpsertDailyLog(pet_id, partial) {
-  const existing = await getTodayLog(pet_id);
+  const date = partial?.date ?? getLocalDateString();
+  if (!isValidDateString(date)) {
+    throw new Error(`不正な日付です: ${date}`);
+  }
+  const { date: _ignored, ...fields } = partial ?? {};
+  const existing = await getLogByDate(pet_id, date);
   const base = existingRowToPayload(existing);
-  const merged = { ...base, ...partial };
+  const merged = { ...base, ...fields, date };
   await upsertDailyLog(pet_id, merged);
+}
+
+/**
+ * @param {'funu'|'mumu'} pet_id
+ * @param {string} date
+ */
+export async function deleteDailyLog(pet_id, date) {
+  const db = getDatabase();
+  await db.runAsync(`DELETE FROM daily_logs WHERE pet_id = ? AND date = ?`, [
+    pet_id,
+    date,
+  ]);
+}
+
+/**
+ * 実質空の日次行を削除する。
+ * @param {'funu'|'mumu'} pet_id
+ * @param {string} date
+ */
+export async function pruneEmptyDailyLog(pet_id, date) {
+  const row = await getLogByDate(pet_id, date);
+  if (!row) return;
+  const p = existingRowToPayload(row);
+  const empty =
+    p.weight == null &&
+    !p.heyanpo_start &&
+    !p.heyanpo_end &&
+    !p.gap_block_checked &&
+    !p.door_lock_checked &&
+    p.meal_id == null &&
+    (p.memo == null || String(p.memo).trim() === '');
+  if (empty) await deleteDailyLog(pet_id, date);
+}
+
+/**
+ * 体重フィールドのみクリア（空行なら削除）
+ * @param {'funu'|'mumu'} pet_id
+ * @param {string} date
+ */
+export async function clearDailyLogWeight(pet_id, date) {
+  await mergeUpsertDailyLog(pet_id, { date, weight: null });
+  await pruneEmptyDailyLog(pet_id, date);
+}
+
+/**
+ * へやんぽ時刻のみクリア（空行なら削除）
+ * @param {'funu'|'mumu'} pet_id
+ * @param {string} date
+ */
+export async function clearDailyLogHeyanpo(pet_id, date) {
+  await mergeUpsertDailyLog(pet_id, {
+    date,
+    heyanpo_start: null,
+    heyanpo_end: null,
+  });
+  await pruneEmptyDailyLog(pet_id, date);
+}
+
+/**
+ * メモのみクリア（空行なら削除）
+ * @param {'funu'|'mumu'} pet_id
+ * @param {string} date
+ */
+export async function clearDailyLogMemo(pet_id, date) {
+  await mergeUpsertDailyLog(pet_id, { date, memo: null });
+  await pruneEmptyDailyLog(pet_id, date);
+}
+
+/**
+ * メモがある日の履歴（新しい日付順）
+ * @param {'funu'|'mumu'} pet_id
+ * @param {number} limit
+ */
+export async function getMemoHistory(pet_id, limit = 90) {
+  const db = getDatabase();
+  const rows = await db.getAllAsync(
+    `SELECT date, memo FROM daily_logs
+     WHERE pet_id = ?
+       AND length(trim(coalesce(memo, ''))) > 0
+     ORDER BY date DESC
+     LIMIT ?`,
+    [pet_id, limit]
+  );
+  return rows ?? [];
 }
 
 /**
@@ -272,6 +384,36 @@ export async function getWeightHistory(pet_id, limit = 14) {
     [pet_id, limit]
   );
   return (rows ?? []).reverse();
+}
+
+/**
+ * 入力欄の参考用。原則「基準日より前」の最新体重。
+ * 過去が無い場合のみ基準日当日の記録へフォールバック。
+ * @param {'funu'|'mumu'} pet_id
+ * @param {string} [asOfDate] YYYY-MM-DD（省略時は本日）
+ * @returns {Promise<{ date: string, weight: number }|null>}
+ */
+export async function getPreviousWeight(pet_id, asOfDate = getLocalDateString()) {
+  const db = getDatabase();
+  const before = await db.getFirstAsync(
+    `SELECT date, weight FROM daily_logs
+     WHERE pet_id = ? AND weight IS NOT NULL AND date < ?
+     ORDER BY date DESC
+     LIMIT 1`,
+    [pet_id, asOfDate]
+  );
+  if (before?.weight != null) {
+    return { date: before.date, weight: Number(before.weight) };
+  }
+  const latest = await db.getFirstAsync(
+    `SELECT date, weight FROM daily_logs
+     WHERE pet_id = ? AND weight IS NOT NULL AND date <= ?
+     ORDER BY date DESC
+     LIMIT 1`,
+    [pet_id, asOfDate]
+  );
+  if (latest?.weight == null) return null;
+  return { date: latest.date, weight: Number(latest.weight) };
 }
 
 /**
