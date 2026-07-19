@@ -20,6 +20,7 @@ export function WeightSection({
   onSaveWeight,
   savingWeight,
   previousWeight,
+  weightDropAlert,
 }) {
   const prevLabel =
     previousWeight != null && Number.isFinite(previousWeight.weight)
@@ -40,6 +41,16 @@ export function WeightSection({
         </TouchableOpacity>
 
         <Text style={styles.prevWeightLine}>{prevLabel}</Text>
+
+        {weightDropAlert ? (
+          <View style={styles.dropBanner}>
+            <Text style={styles.dropTitle}>体重急減の注意</Text>
+            <Text style={styles.dropBody}>
+              前回比 {weightDropAlert.dropPct}% 減（{weightDropAlert.previous} g →{' '}
+              {weightDropAlert.next} g）
+            </Text>
+          </View>
+        ) : null}
 
         <TextInput
           style={styles.input}
@@ -100,6 +111,25 @@ const styles = StyleSheet.create({
     color: FG,
     opacity: 0.88,
     marginBottom: 10,
+  },
+  dropBanner: {
+    backgroundColor: '#E8DDD4',
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+  },
+  dropTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: FG,
+    marginBottom: 2,
+  },
+  dropBody: {
+    fontSize: 12,
+    color: FG,
+    opacity: 0.85,
+    lineHeight: 17,
   },
   input: {
     backgroundColor: CARD,

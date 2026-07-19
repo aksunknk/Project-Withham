@@ -16,6 +16,7 @@ import {
   getMaintenanceHistory,
   insertMaintenanceLog,
 } from '../database/db';
+import { scheduleMaintenanceReminder } from '../notifications/reminders';
 
 const BG = '#FDFBF7';
 const CARD = '#F5EFE6';
@@ -102,7 +103,11 @@ export function MaintenanceSection() {
       setExecutedAt(new Date());
       setNextDate(stripTime(new Date()));
       await refreshSummary();
-      Alert.alert('保存しました', 'お掃除・お手入れを記録しました。');
+      await scheduleMaintenanceReminder(next_scheduled_date);
+      Alert.alert(
+        '保存しました',
+        `お掃除・お手入れを記録しました。\n次回予定日の朝に通知します（${next_scheduled_date}）。`
+      );
     } catch (e) {
       console.error('[MaintenanceSection save]', e);
       Alert.alert('保存エラー', String(e?.message ?? e));

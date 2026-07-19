@@ -21,6 +21,10 @@ import {
   mergeUpsertDailyLog,
   parseLocalDateString,
 } from '../database/db';
+import {
+  evaluateWeightDrop,
+  formatWeightDropMessage,
+} from '../utils/weightAlert';
 import { WeightSection } from './WeightSection';
 
 const BG = '#FDFBF7';
@@ -65,11 +69,12 @@ function parseWeightInput(text) {
   return Number.isFinite(n) ? n : null;
 }
 
-export function PetObservationCard({ petId }) {
+export function PetObservationCard({ petId, onLogChanged }) {
   const [recordDateStr, setRecordDateStr] = useState(getLocalDateString());
   const [showRecordDate, setShowRecordDate] = useState(false);
   const [weightText, setWeightText] = useState('');
   const [previousWeight, setPreviousWeight] = useState(null);
+  const [weightDropAlert, setWeightDropAlert] = useState(null);
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
   const [sealed, setSealed] = useState(false);
@@ -112,6 +117,15 @@ export function PetObservationCard({ petId }) {
       setSealed(gapOn && doorOn);
       setMealId(row.meal_id != null ? Number(row.meal_id) : null);
       setMemoText(row.memo ?? '');
+      if (
+        row.weight != null &&
+        prevW != null &&
+        prevW.date !== recordDateStr
+      ) {
+        setWeightDropAlert(evaluateWeightDrop(prevW.weight, Number(row.weight)));
+      } else {
+        setWeightDropAlert(null);
+      }
     } else {
       setWeightText('');
       setStartDate(null);
@@ -119,6 +133,7 @@ export function PetObservationCard({ petId }) {
       setSealed(false);
       setMealId(null);
       setMemoText('');
+      setWeightDropAlert(null);
     }
   }, [petId, recordDateStr]);
 
@@ -132,40 +147,54 @@ export function PetObservationCard({ petId }) {
       const before = await getLogByDate(petId, recordDateStr);
       const prevWeight = before?.weight != null ? Number(before.weight) : null;
       const nextWeight = parseWeightInput(weightText);
+      const priorRef = await getPreviousWeight(petId, recordDateStr);
+      const priorForAlert =
+        priorRef && priorRef.date !== recordDateStr ? priorRef.weight : null;
+      const drop = evaluateWeightDrop(priorForAlert, nextWeight);
+
       await mergeUpsertDailyLog(petId, {
         date: recordDateStr,
         weight: nextWeight,
       });
       setWeightText(nextWeight != null ? String(nextWeight) : '');
       setPreviousWeight(await getPreviousWeight(petId, recordDateStr));
-      Alert.alert(
-        '保存しました',
-        `体重を記録しました。\n記録日: ${recordDateStr}`,
-        [
-          {
-            text: 'アンドゥ',
-            style: 'destructive',
-            onPress: async () => {
-              try {
-                await mergeUpsertDailyLog(petId, {
-                  date: recordDateStr,
-                  weight: prevWeight,
-                });
-                await load();
-              } catch (e) {
-                Alert.alert('アンドゥ失敗', String(e?.message ?? e));
-              }
-            },
-          },
-          { text: 'OK' },
-        ]
-      );
+      setWeightDropAlert(drop);
+
+      const undoBtn = {
+        text: 'アンドゥ',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await mergeUpsertDailyLog(petId, {
+              date: recordDateStr,
+              weight: prevWeight,
+            });
+            await load();
+          } catch (e) {
+            Alert.alert('アンドゥ失敗', String(e?.message ?? e));
+          }
+        },
+      };
+
+      onLogChanged?.();
+      if (drop) {
+        Alert.alert('体重が急に減っています', formatWeightDropMessage(drop), [
+          undoBtn,
+          { text: '了解' },
+        ]);
+      } else {
+        Alert.alert(
+          '保存しました',
+          `体重を記録しました。\n記録日: ${recordDateStr}`,
+          [undoBtn, { text: 'OK' }]
+        );
+      }
     } catch (e) {
       Alert.alert('保存エラー', String(e?.message ?? e));
     } finally {
       setSavingWeight(false);
     }
-  }, [petId, weightText, recordDateStr, load]);
+  }, [petId, weightText, recordDateStr, load, onLogChanged]);
 
   const saveHeyanpo = useCallback(async () => {
     setSavingHeyanpo(true);
@@ -224,11 +253,12 @@ export function PetObservationCard({ petId }) {
         gap_block_checked: next ? 1 : 0,
         door_lock_checked: next ? 1 : 0,
       });
+      onLogChanged?.();
     } catch (e) {
       setSealed(prev);
       Alert.alert('保存エラー', String(e?.message ?? e));
     }
-  }, [petId, sealed, recordDateStr]);
+  }, [petId, sealed, recordDateStr, onLogChanged]);
 
   const onHeyanpoMegaTap = useCallback(() => {
     const now = new Date();
@@ -345,6 +375,7 @@ export function PetObservationCard({ petId }) {
         onSaveWeight={saveWeight}
         savingWeight={savingWeight}
         previousWeight={previousWeight}
+        weightDropAlert={weightDropAlert}
       />
       {showRecordDate && (
         <DateTimePicker

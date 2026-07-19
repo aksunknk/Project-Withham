@@ -14,6 +14,7 @@ import { InputScreen } from './src/screens/InputScreen';
 import { InsightsScreen } from './src/screens/InsightsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { initDB } from './src/database/db';
+import { bootstrapReminders } from './src/notifications/reminders';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -84,6 +85,9 @@ export default function App() {
             'DB 初期化がタイムアウトしました（SQLite が応答しません）。アプリを再起動するか、Expo Go を最新に更新してください。'
           ),
         ]);
+        bootstrapReminders().catch((e) =>
+          console.warn('[bootstrapReminders]', e)
+        );
         if (active) setDbError(null);
       } catch (e) {
         console.error('[initDB]', e);

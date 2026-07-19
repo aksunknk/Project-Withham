@@ -4,10 +4,12 @@ import {
   Alert,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as DocumentPicker from 'expo-document-picker';
@@ -22,6 +24,12 @@ import {
   importBackupObject,
   parseBackupJson,
 } from '../database/backup';
+import {
+  getNotificationPrefs,
+  requestNotificationPermissions,
+  rescheduleAllReminders,
+  setNotificationPrefs,
+} from '../notifications/reminders';
 import { shareTextFile } from '../utils/shareFile';
 
 const BG = '#FDFBF7';
@@ -33,6 +41,24 @@ const H_PAD = 20;
 export function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const [busy, setBusy] = useState(false);
+  const [notifyMaintenance, setNotifyMaintenance] = useState(true);
+  const [notifyDaily, setNotifyDaily] = useState(true);
+
+  const loadPrefs = useCallback(async () => {
+    try {
+      const prefs = await getNotificationPrefs();
+      setNotifyMaintenance(prefs.maintenance);
+      setNotifyDaily(prefs.dailyRecord);
+    } catch (e) {
+      console.warn('[SettingsScreen prefs]', e);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadPrefs();
+    }, [loadPrefs])
+  );
 
   const run = useCallback(async (fn) => {
     setBusy(true);
@@ -44,6 +70,65 @@ export function SettingsScreen() {
       setBusy(false);
     }
   }, []);
+
+  const onToggleMaintenance = useCallback(
+    (value) => {
+      setNotifyMaintenance(value);
+      run(async () => {
+        if (value) {
+          const ok = await requestNotificationPermissions();
+          if (!ok) {
+            setNotifyMaintenance(false);
+            Alert.alert(
+              '通知が許可されていません',
+              '端末の設定から通知を許可してください。'
+            );
+            await setNotificationPrefs({ maintenance: false });
+            return;
+          }
+        }
+        await setNotificationPrefs({ maintenance: value });
+      });
+    },
+    [run]
+  );
+
+  const onToggleDaily = useCallback(
+    (value) => {
+      setNotifyDaily(value);
+      run(async () => {
+        if (value) {
+          const ok = await requestNotificationPermissions();
+          if (!ok) {
+            setNotifyDaily(false);
+            Alert.alert(
+              '通知が許可されていません',
+              '端末の設定から通知を許可してください。'
+            );
+            await setNotificationPrefs({ dailyRecord: false });
+            return;
+          }
+        }
+        await setNotificationPrefs({ dailyRecord: value });
+      });
+    },
+    [run]
+  );
+
+  const onReschedule = useCallback(() => {
+    run(async () => {
+      const ok = await requestNotificationPermissions();
+      if (!ok) {
+        Alert.alert(
+          '通知が許可されていません',
+          '端末の設定から通知を許可してください。'
+        );
+        return;
+      }
+      await rescheduleAllReminders();
+      Alert.alert('完了', '通知スケジュールを更新しました。');
+    });
+  }, [run]);
 
   const onExportJson = useCallback(() => {
     run(async () => {
@@ -70,26 +155,24 @@ export function SettingsScreen() {
     });
   }, [run]);
 
-  const doImport = useCallback(
-    async (mode) => {
-      const picked = await DocumentPicker.getDocumentAsync({
-        type: ['application/json', 'text/plain', '*/*'],
-        copyToCacheDirectory: true,
-      });
-      if (picked.canceled || !picked.assets?.[0]?.uri) return;
-      const uri = picked.assets[0].uri;
-      const text = await readAsStringAsync(uri, { encoding: 'utf8' });
-      const data = parseBackupJson(text);
-      await importBackupObject(data, mode);
-      Alert.alert(
-        'インポート完了',
-        mode === 'replace'
-          ? '既存データを置き換えました。記録・分析タブを開き直すと反映されます。'
-          : 'バックアップをマージしました。記録・分析タブを開き直すと反映されます。'
-      );
-    },
-    []
-  );
+  const doImport = useCallback(async (mode) => {
+    const picked = await DocumentPicker.getDocumentAsync({
+      type: ['application/json', 'text/plain', '*/*'],
+      copyToCacheDirectory: true,
+    });
+    if (picked.canceled || !picked.assets?.[0]?.uri) return;
+    const uri = picked.assets[0].uri;
+    const text = await readAsStringAsync(uri, { encoding: 'utf8' });
+    const data = parseBackupJson(text);
+    await importBackupObject(data, mode);
+    await rescheduleAllReminders();
+    Alert.alert(
+      'インポート完了',
+      mode === 'replace'
+        ? '既存データを置き換えました。記録・分析タブを開き直すと反映されます。'
+        : 'バックアップをマージしました。記録・分析タブを開き直すと反映されます。'
+    );
+  }, []);
 
   const onImport = useCallback(() => {
     Alert.alert('バックアップを取り込む', '取り込み方法を選んでください。', [
@@ -130,9 +213,50 @@ export function SettingsScreen() {
       >
         <Text style={styles.headline}>データ</Text>
         <Text style={styles.lead}>
-          端末内データのバックアップと CSV
-          出力です。機種変更前に JSON バックアップを残してください。
+          通知とバックアップの設定です。機種変更前に JSON
+          バックアップを残してください。
         </Text>
+
+        <Text style={styles.section}>通知</Text>
+        <View style={styles.card}>
+          <View style={styles.switchRow}>
+            <View style={styles.switchCopy}>
+              <Text style={styles.btnText}>お手入れ予定</Text>
+              <Text style={styles.btnSub}>次回予定日の朝 10:00 に通知</Text>
+            </View>
+            <Switch
+              value={notifyMaintenance}
+              onValueChange={onToggleMaintenance}
+              trackColor={{ false: '#D4C9BC', true: '#C4B5A5' }}
+              thumbColor={notifyMaintenance ? FG : '#F5EFE6'}
+              disabled={busy}
+            />
+          </View>
+          <View style={styles.switchRow}>
+            <View style={styles.switchCopy}>
+              <Text style={styles.btnText}>記録リマインド</Text>
+              <Text style={styles.btnSub}>毎日 20:00 に未記録を促す</Text>
+            </View>
+            <Switch
+              value={notifyDaily}
+              onValueChange={onToggleDaily}
+              trackColor={{ false: '#D4C9BC', true: '#C4B5A5' }}
+              thumbColor={notifyDaily ? FG : '#F5EFE6'}
+              disabled={busy}
+            />
+          </View>
+          <TouchableOpacity
+            style={styles.btn}
+            onPress={onReschedule}
+            disabled={busy}
+            activeOpacity={0.88}
+          >
+            <Text style={styles.btnText}>通知を再スケジュール</Text>
+            <Text style={styles.btnSub}>
+              再起動後や許可変更後に押してください
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <Text style={styles.section}>バックアップ</Text>
         <View style={styles.card}>
@@ -227,6 +351,20 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 18,
     gap: 8,
+  },
+  switchRow: {
+    backgroundColor: BG,
+    borderRadius: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  switchCopy: {
+    flex: 1,
+    paddingRight: 8,
   },
   btn: {
     backgroundColor: BG,

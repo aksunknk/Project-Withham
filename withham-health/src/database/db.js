@@ -8,6 +8,10 @@ let dbSingleton = null;
 export const SETTINGS_KEYS = {
   ICON_FUNU: 'icon_funu',
   ICON_MUMU: 'icon_mumu',
+  /** '1' | '0' — お手入れ予定のローカル通知 */
+  NOTIFY_MAINTENANCE: 'notify_maintenance',
+  /** '1' | '0' — 本日未記録の夕方リマインド */
+  NOTIFY_DAILY_RECORD: 'notify_daily_record',
 };
 
 const SCHEMA_KEY = 'schema_version';
@@ -187,6 +191,36 @@ export async function getLogByDate(pet_id, date) {
 /** @param {'funu'|'mumu'} pet_id */
 export async function getTodayLog(pet_id) {
   return getLogByDate(pet_id, getLocalDateString());
+}
+
+/**
+ * 本日の体重未記録 / 安全確認未完了を個体ごとに返す。
+ * @returns {Promise<Array<{ pet_id: 'funu'|'mumu', label: string, missingWeight: boolean, missingSafety: boolean }>>}
+ */
+export async function getTodayCareGaps() {
+  const today = getLocalDateString();
+  /** @type {Array<'funu'|'mumu'>} */
+  const pets = ['funu', 'mumu'];
+  const out = [];
+  for (const pet_id of pets) {
+    const row = await getLogByDate(pet_id, today);
+    const missingWeight = row == null || row.weight == null;
+    const gapOn = row?.gap_block_checked === 1;
+    const doorRaw = row?.door_lock_checked;
+    const doorOn =
+      doorRaw === undefined || doorRaw === null ? gapOn : doorRaw === 1;
+    const sealed = Boolean(gapOn && doorOn);
+    const missingSafety = !sealed;
+    if (missingWeight || missingSafety) {
+      out.push({
+        pet_id,
+        label: pet_id === 'funu' ? 'ふぬ' : 'むむ',
+        missingWeight,
+        missingSafety,
+      });
+    }
+  }
+  return out;
 }
 
 /**

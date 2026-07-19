@@ -7,18 +7,32 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { copyAsync, documentDirectory } from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { StatusBar } from 'expo-status-bar';
-import { getSetting, SETTINGS_KEYS, setSetting } from '../database/db';
+import {
+  getSetting,
+  getTodayCareGaps,
+  SETTINGS_KEYS,
+  setSetting,
+} from '../database/db';
 import { MaintenanceSection } from '../components/MaintenanceSection';
 import { PetHeader } from '../components/PetHeader';
 import { PetObservationCard } from '../components/PetObservationCard';
 
 const BG = '#FDFBF7';
+const CARD = '#F5EFE6';
 const FG = '#4A4A4A';
 const H_PAD = 20;
+
+function formatCareGapLine(gap) {
+  const parts = [];
+  if (gap.missingWeight) parts.push('体重');
+  if (gap.missingSafety) parts.push('安全確認');
+  return `${gap.label}: ${parts.join('・')}`;
+}
 
 export function InputScreen() {
   const insets = useSafeAreaInsets();
@@ -28,6 +42,15 @@ export function InputScreen() {
   const [pet, setPet] = useState('funu');
   const [iconFunu, setIconFunu] = useState(null);
   const [iconMumu, setIconMumu] = useState(null);
+  const [careGaps, setCareGaps] = useState([]);
+
+  const refreshCareGaps = useCallback(async () => {
+    try {
+      setCareGaps(await getTodayCareGaps());
+    } catch (e) {
+      console.error('[careGaps]', e);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,6 +71,12 @@ export function InputScreen() {
       cancelled = true;
     };
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshCareGaps();
+    }, [refreshCareGaps])
+  );
 
   useEffect(() => {
     petRef.current = pet;
@@ -142,6 +171,19 @@ export function InputScreen() {
           <Text style={styles.headline}>hunumumuDiary</Text>
         </View>
 
+        {careGaps.length > 0 ? (
+          <View style={[styles.padded, styles.gapWrap]}>
+            <View style={styles.gapBanner}>
+              <Text style={styles.gapTitle}>本日まだの記録があります</Text>
+              {careGaps.map((g) => (
+                <Text key={g.pet_id} style={styles.gapLine}>
+                  {formatCareGapLine(g)}
+                </Text>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
         <View style={styles.padded}>
           <PetHeader
             activePet={pet}
@@ -168,12 +210,18 @@ export function InputScreen() {
         >
           <View style={[styles.page, { width: winW }]}>
             <View style={styles.pageInner}>
-              <PetObservationCard petId="funu" />
+              <PetObservationCard
+                petId="funu"
+                onLogChanged={refreshCareGaps}
+              />
             </View>
           </View>
           <View style={[styles.page, { width: winW }]}>
             <View style={styles.pageInner}>
-              <PetObservationCard petId="mumu" />
+              <PetObservationCard
+                petId="mumu"
+                onLogChanged={refreshCareGaps}
+              />
             </View>
           </View>
         </ScrollView>
@@ -205,6 +253,27 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     fontFamily: 'serif',
     includeFontPadding: false,
+  },
+  gapWrap: {
+    marginBottom: 10,
+  },
+  gapBanner: {
+    backgroundColor: CARD,
+    borderRadius: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  gapTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: FG,
+    marginBottom: 6,
+  },
+  gapLine: {
+    fontSize: 13,
+    color: FG,
+    opacity: 0.85,
+    lineHeight: 19,
   },
   swipeHint: {
     fontSize: 12,
