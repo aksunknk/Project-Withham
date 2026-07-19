@@ -471,6 +471,93 @@ export async function getHeyanpoHistory(pet_id, limit = 60) {
   return rows ?? [];
 }
 
+/**
+ * HH:mm → 分（不正なら null）
+ * @param {string|null|undefined} start
+ * @param {string|null|undefined} end
+ */
+export function heyanpoMinutesBetween(start, end) {
+  if (!start || !end) return null;
+  const [sh, sm] = String(start).split(':').map((x) => parseInt(x, 10));
+  const [eh, em] = String(end).split(':').map((x) => parseInt(x, 10));
+  if (![sh, sm, eh, em].every((n) => Number.isFinite(n))) return null;
+  const mins = eh * 60 + em - (sh * 60 + sm);
+  return mins >= 0 ? mins : null;
+}
+
+/**
+ * へやんぽ所要時間の推移（古い日付 → 新しい日付）。開始・終了が揃った日のみ。
+ * @param {'funu'|'mumu'} pet_id
+ * @param {number} limit
+ * @returns {Promise<Array<{ date: string, minutes: number }>>}
+ */
+export async function getHeyanpoDurationHistory(pet_id, limit = 14) {
+  const db = getDatabase();
+  const rows = await db.getAllAsync(
+    `SELECT date, heyanpo_start, heyanpo_end FROM daily_logs
+     WHERE pet_id = ?
+       AND length(trim(coalesce(heyanpo_start, ''))) >= 4
+       AND length(trim(coalesce(heyanpo_end, ''))) >= 4
+     ORDER BY date DESC
+     LIMIT ?`,
+    [pet_id, limit]
+  );
+  const out = [];
+  for (const r of [...(rows ?? [])].reverse()) {
+    const minutes = heyanpoMinutesBetween(r.heyanpo_start, r.heyanpo_end);
+    if (minutes == null) continue;
+    out.push({ date: r.date, minutes });
+  }
+  return out;
+}
+
+/**
+ * 指定月の日次マーク（カレンダー用）
+ * @param {'funu'|'mumu'} pet_id
+ * @param {number} year
+ * @param {number} month 1-12
+ * @returns {Promise<Record<string, { hasWeight: boolean, hasActivity: boolean, weight: number|null }>>}
+ *   キーは YYYY-MM-DD
+ */
+export async function getMonthDayMarks(pet_id, year, month) {
+  const db = getDatabase();
+  const y = Number(year);
+  const m = Number(month);
+  const start = `${y}-${String(m).padStart(2, '0')}-01`;
+  const lastDay = new Date(y, m, 0).getDate();
+  const end = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  const rows = await db.getAllAsync(
+    `SELECT date, weight, heyanpo_start, heyanpo_end,
+            gap_block_checked, door_lock_checked, meal_id, memo
+     FROM daily_logs
+     WHERE pet_id = ? AND date >= ? AND date <= ?`,
+    [pet_id, start, end]
+  );
+  /** @type {Record<string, { hasWeight: boolean, hasActivity: boolean, weight: number|null }>} */
+  const marks = {};
+  for (const r of rows ?? []) {
+    const hasWeight = r.weight != null;
+    const hasHey =
+      lengthTrim(r.heyanpo_start) > 0 || lengthTrim(r.heyanpo_end) > 0;
+    const hasMemo = lengthTrim(r.memo) > 0;
+    const hasMeal = r.meal_id != null;
+    const hasSafety =
+      r.gap_block_checked === 1 || r.door_lock_checked === 1;
+    const hasActivity =
+      hasWeight || hasHey || hasMemo || hasMeal || hasSafety;
+    marks[r.date] = {
+      hasWeight,
+      hasActivity,
+      weight: hasWeight ? Number(r.weight) : null,
+    };
+  }
+  return marks;
+}
+
+function lengthTrim(v) {
+  return String(v ?? '').trim().length;
+}
+
 export async function getSetting(key) {
   const db = getDatabase();
   const row = await db.getFirstAsync(
@@ -605,10 +692,18 @@ export async function getWeightHistoryInDateRange(pet_id, days) {
  * @param {number} days
  * @returns {Promise<number|null>}
  */
+/**
+ * @param {'funu'|'mumu'} pet_id
+ * @param {number|null} days null なら全期間
+ */
 export async function getAvgHeyanpoMinutesInDateRange(pet_id, days) {
   const db = getDatabase();
-  const start = getInsightRangeStartDate(days);
-  const end = getLocalDateString();
+  const params = [pet_id];
+  let dateClause = '';
+  if (days != null) {
+    dateClause = ' AND date >= ? AND date <= ?';
+    params.push(getInsightRangeStartDate(days), getLocalDateString());
+  }
   const row = await db.getFirstAsync(
     `SELECT AVG(
          (strftime('%s', date || ' ' || heyanpo_end || ':00')
@@ -616,12 +711,12 @@ export async function getAvgHeyanpoMinutesInDateRange(pet_id, days) {
        ) AS avg_min
      FROM daily_logs
      WHERE pet_id = ?
-       AND date >= ? AND date <= ?
+       ${dateClause}
        AND length(trim(coalesce(heyanpo_start, ''))) >= 4
        AND length(trim(coalesce(heyanpo_end, ''))) >= 4
        AND strftime('%s', date || ' ' || heyanpo_end || ':00')
         >= strftime('%s', date || ' ' || heyanpo_start || ':00')`,
-    [pet_id, start, end]
+    params
   );
   if (row == null || row.avg_min == null) return null;
   const v = Number(row.avg_min);
@@ -633,19 +728,27 @@ export async function getAvgHeyanpoMinutesInDateRange(pet_id, days) {
  * @param {'funu'|'mumu'} pet_id
  * @param {number} days
  */
+/**
+ * @param {'funu'|'mumu'} pet_id
+ * @param {number|null} days null なら全期間
+ */
 export async function getMealServeCountsInDateRange(pet_id, days) {
   const db = getDatabase();
-  const start = getInsightRangeStartDate(days);
-  const end = getLocalDateString();
+  const params = [pet_id];
+  let dateClause = '';
+  if (days != null) {
+    dateClause = ' AND date >= ? AND date <= ?';
+    params.push(getInsightRangeStartDate(days), getLocalDateString());
+  }
   const rows = await db.getAllAsync(
     `SELECT meal_id, COUNT(*) AS cnt
      FROM daily_logs
      WHERE pet_id = ?
-       AND date >= ? AND date <= ?
+       ${dateClause}
        AND meal_id IS NOT NULL
      GROUP BY meal_id
      ORDER BY cnt DESC`,
-    [pet_id, start, end]
+    params
   );
   const meals = await getCustomMeals();
   const idToName = new Map(meals.map((m) => [Number(m.id), m.name]));

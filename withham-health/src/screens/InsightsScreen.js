@@ -21,6 +21,7 @@ import {
   clearDailyLogMemo,
   clearDailyLogWeight,
   getAvgHeyanpoMinutesInDateRange,
+  getHeyanpoDurationHistory,
   getHeyanpoHistory,
   getInsightRangeStartDate,
   getLocalDateString,
@@ -30,6 +31,9 @@ import {
   mergeUpsertDailyLog,
   parseLocalDateString,
 } from '../database/db';
+import { CompareWeightChart } from '../components/CompareWeightChart';
+import { MonthCalendar } from '../components/MonthCalendar';
+import { getInsightRange, INSIGHT_RANGES } from '../utils/insightRange';
 
 const BG = '#FDFBF7';
 const CARD = '#F5EFE6';
@@ -78,10 +82,6 @@ function heyanpoDurationLabel(start, end) {
   return formatAvgMinutes(mins);
 }
 
-function chartPointLimit(days) {
-  return days === 7 ? 14 : 30;
-}
-
 function normalizeTimeInput(text) {
   const t = String(text ?? '').trim();
   if (!t) return null;
@@ -126,8 +126,10 @@ function HistoryModal({ visible, title, onClose, children }) {
   );
 }
 
-function PetInsightBlock({ petId, days, winW, reloadToken }) {
+function PetInsightBlock({ petId, rangeKey, winW, reloadToken }) {
+  const range = getInsightRange(rangeKey);
   const [weights, setWeights] = useState([]);
+  const [heyanpoDurations, setHeyanpoDurations] = useState([]);
   const [weightList, setWeightList] = useState([]);
   const [heyanpoList, setHeyanpoList] = useState([]);
   const [memoList, setMemoList] = useState([]);
@@ -151,16 +153,18 @@ function PetInsightBlock({ petId, days, winW, reloadToken }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const limit = chartPointLimit(days);
-      const [w, h, m, wList, hyList, memoHist] = await Promise.all([
+      const limit = range.chartLimit;
+      const [w, heyDur, h, m, wList, hyList, memoHist] = await Promise.all([
         getWeightHistory(petId, limit),
-        getAvgHeyanpoMinutesInDateRange(petId, days),
-        getMealServeCountsInDateRange(petId, days),
+        getHeyanpoDurationHistory(petId, limit),
+        getAvgHeyanpoMinutesInDateRange(petId, range.days),
+        getMealServeCountsInDateRange(petId, range.days),
         getWeightHistory(petId, HISTORY_LIMIT),
         getHeyanpoHistory(petId, HISTORY_LIMIT),
         getMemoHistory(petId, HISTORY_LIMIT),
       ]);
       setWeights(w);
+      setHeyanpoDurations(heyDur);
       setAvgHey(h);
       setMeals(m);
       setWeightList([...wList].reverse());
@@ -169,6 +173,7 @@ function PetInsightBlock({ petId, days, winW, reloadToken }) {
     } catch (e) {
       console.error('[InsightsScreen]', petId, e);
       setWeights([]);
+      setHeyanpoDurations([]);
       setAvgHey(null);
       setMeals([]);
       setWeightList([]);
@@ -177,7 +182,7 @@ function PetInsightBlock({ petId, days, winW, reloadToken }) {
     } finally {
       setLoading(false);
     }
-  }, [petId, days]);
+  }, [petId, range.chartLimit, range.days]);
 
   useEffect(() => {
     load();
@@ -281,10 +286,14 @@ function PetInsightBlock({ petId, days, winW, reloadToken }) {
     r.weight != null ? Number(r.weight) : 0
   );
   const showChart = dataPoints.length >= 2;
+  const heyLabels = heyanpoDurations.map((r) => formatChartLabel(r.date));
+  const heyPoints = heyanpoDurations.map((r) => r.minutes);
+  const showHeyChart = heyPoints.length >= 2;
 
   const label = petId === 'funu' ? 'ふぬ' : 'むむ';
-  const startStr = getInsightRangeStartDate(days);
   const endStr = getLocalDateString();
+  const startStr =
+    range.days != null ? getInsightRangeStartDate(range.days) : '開始〜';
 
   return (
     <View style={styles.petCard}>
@@ -293,13 +302,14 @@ function PetInsightBlock({ petId, days, winW, reloadToken }) {
         <ActivityIndicator color={FG} style={styles.loader} />
       ) : (
         <>
+          <Text style={styles.rangeNote}>{range.detailLabel}</Text>
           <Text style={styles.rangeNote}>
-            平均・食事の対象期間: {startStr} 〜 {endStr}
+            平均・食事: {startStr} 〜 {endStr}
           </Text>
 
           <Text style={styles.sectionHeading}>体重の推移</Text>
           <Text style={styles.chartCaption}>
-            直近 {chartPointLimit(days)}{' '}
+            直近 {range.chartLimit}{' '}
             回の計測を日付順に表示します（計測日が離れていても結線します）。
           </Text>
           {showChart ? (
@@ -322,6 +332,36 @@ function PetInsightBlock({ petId, days, winW, reloadToken }) {
               体重が2回以上記録されると、折れ線グラフを表示します。
             </Text>
           )}
+
+          <Text style={styles.sectionHeading}>へやんぽ時間の推移</Text>
+          <Text style={styles.chartCaption}>
+            直近 {range.chartLimit}{' '}
+            回（開始・終了が揃った記録）を分単位で表示します。
+          </Text>
+          {showHeyChart ? (
+            <LineChart
+              data={{
+                labels: heyLabels,
+                datasets: [{ data: heyPoints }],
+              }}
+              width={chartW}
+              height={200}
+              chartConfig={{ ...chartBase, decimalPlaces: 0 }}
+              bezier
+              style={styles.chart}
+              withInnerLines
+              withOuterLines
+              fromZero={false}
+              yAxisSuffix="分"
+            />
+          ) : (
+            <Text style={styles.hint}>
+              へやんぽが2回以上記録されると、折れ線グラフを表示します。
+            </Text>
+          )}
+
+          <Text style={styles.sectionHeading}>記録カレンダー</Text>
+          <MonthCalendar petId={petId} reloadToken={reloadToken} />
 
           <View style={styles.historyBtnRow}>
             <TouchableOpacity
@@ -569,9 +609,10 @@ function PetInsightBlock({ petId, days, winW, reloadToken }) {
 export function InsightsScreen() {
   const insets = useSafeAreaInsets();
   const { width: winW } = useWindowDimensions();
-  const [days, setDays] = useState(7);
+  const [rangeKey, setRangeKey] = useState('short');
   const [reloadToken, setReloadToken] = useState(0);
   const skipFirstFocus = useRef(true);
+  const activeRange = getInsightRange(rangeKey);
 
   useFocusEffect(
     useCallback(() => {
@@ -595,45 +636,43 @@ export function InsightsScreen() {
         <View style={styles.padded}>
           <Text style={styles.headline}>分析</Text>
           <Text style={styles.lead}>
-            直近の記録から傾向を確認できます。履歴はタップで編集できます。
+            グラフは計測回数ベース、平均・食事はカレンダー期間です。履歴はタップで編集できます。
           </Text>
 
           <View style={styles.toggleRow}>
-            <TouchableOpacity
-              style={[styles.toggleBtn, days === 7 && styles.toggleBtnOn]}
-              onPress={() => setDays(7)}
-              activeOpacity={0.88}
-            >
-              <Text
-                style={[styles.toggleText, days === 7 && styles.toggleTextOn]}
-              >
-                直近7日間
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.toggleBtn, days === 30 && styles.toggleBtnOn]}
-              onPress={() => setDays(30)}
-              activeOpacity={0.88}
-            >
-              <Text
-                style={[styles.toggleText, days === 30 && styles.toggleTextOn]}
-              >
-                直近30日間
-              </Text>
-            </TouchableOpacity>
+            {Object.values(INSIGHT_RANGES).map((preset) => {
+              const on = rangeKey === preset.key;
+              return (
+                <TouchableOpacity
+                  key={preset.key}
+                  style={[styles.toggleBtn, on && styles.toggleBtnOn]}
+                  onPress={() => setRangeKey(preset.key)}
+                  activeOpacity={0.88}
+                >
+                  <Text style={[styles.toggleText, on && styles.toggleTextOn]}>
+                    {preset.toggleLabel}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
+          <Text style={styles.rangeDetail}>{activeRange.detailLabel}</Text>
         </View>
 
         <View style={styles.padded}>
+          <CompareWeightChart
+            rangeKey={rangeKey}
+            reloadToken={reloadToken}
+          />
           <PetInsightBlock
             petId="funu"
-            days={days}
+            rangeKey={rangeKey}
             winW={winW}
             reloadToken={reloadToken}
           />
           <PetInsightBlock
             petId="mumu"
-            days={days}
+            rangeKey={rangeKey}
             winW={winW}
             reloadToken={reloadToken}
           />
@@ -679,20 +718,28 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: CARD,
     borderRadius: 20,
-    paddingVertical: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 4,
     alignItems: 'center',
   },
   toggleBtnOn: {
     backgroundColor: '#E8DDD4',
   },
   toggleText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: FG,
     opacity: 0.75,
   },
   toggleTextOn: {
     opacity: 1,
+  },
+  rangeDetail: {
+    fontSize: 12,
+    color: FG,
+    opacity: 0.65,
+    marginBottom: 8,
+    lineHeight: 17,
   },
   petCard: {
     backgroundColor: CARD,
