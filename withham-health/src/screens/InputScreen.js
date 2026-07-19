@@ -13,10 +13,9 @@ import { copyAsync, documentDirectory } from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { StatusBar } from 'expo-status-bar';
 import {
-  getSetting,
   getTodayCareGaps,
-  SETTINGS_KEYS,
-  setSetting,
+  listActivePets,
+  updatePet,
 } from '../database/db';
 import { MaintenanceSection } from '../components/MaintenanceSection';
 import { PetHeader } from '../components/PetHeader';
@@ -38,11 +37,19 @@ export function InputScreen() {
   const insets = useSafeAreaInsets();
   const { width: winW } = useWindowDimensions();
   const pagerRef = useRef(null);
-  const petRef = useRef('funu');
-  const [pet, setPet] = useState('funu');
-  const [iconFunu, setIconFunu] = useState(null);
-  const [iconMumu, setIconMumu] = useState(null);
+  const petIdRef = useRef(null);
+  const [pets, setPets] = useState([]);
+  const [activePetId, setActivePetId] = useState(null);
   const [careGaps, setCareGaps] = useState([]);
+
+  const refreshPets = useCallback(async () => {
+    const list = await listActivePets();
+    setPets(list);
+    setActivePetId((prev) => {
+      if (prev && list.some((p) => p.id === prev)) return prev;
+      return list[0]?.id ?? null;
+    });
+  }, []);
 
   const refreshCareGaps = useCallback(async () => {
     try {
@@ -52,40 +59,22 @@ export function InputScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [a, b] = await Promise.all([
-          getSetting(SETTINGS_KEYS.ICON_FUNU),
-          getSetting(SETTINGS_KEYS.ICON_MUMU),
-        ]);
-        if (cancelled) return;
-        setIconFunu(a);
-        setIconMumu(b);
-      } catch (e) {
-        console.error('[icons load]', e);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   useFocusEffect(
     useCallback(() => {
+      refreshPets().catch((e) => console.error('[pets load]', e));
       refreshCareGaps();
-    }, [refreshCareGaps])
+    }, [refreshPets, refreshCareGaps])
   );
 
   useEffect(() => {
-    petRef.current = pet;
-  }, [pet]);
+    petIdRef.current = activePetId;
+  }, [activePetId]);
 
   const goToPet = useCallback(
-    (p) => {
-      const index = p === 'funu' ? 0 : 1;
-      setPet(p);
+    (id) => {
+      const index = pets.findIndex((p) => p.id === id);
+      if (index < 0) return;
+      setActivePetId(id);
       requestAnimationFrame(() => {
         pagerRef.current?.scrollTo({
           x: index * winW,
@@ -93,68 +82,70 @@ export function InputScreen() {
         });
       });
     },
-    [winW]
+    [pets, winW]
   );
 
   useEffect(() => {
-    const index = petRef.current === 'funu' ? 0 : 1;
+    if (!activePetId || pets.length === 0) return;
+    const index = pets.findIndex((p) => p.id === activePetId);
+    if (index < 0) return;
     pagerRef.current?.scrollTo({
       x: index * winW,
       animated: false,
     });
-  }, [winW]);
+  }, [winW, pets, activePetId]);
 
   const onPagerMomentumEnd = useCallback(
     (e) => {
       const x = e.nativeEvent.contentOffset.x;
       const page = Math.round(x / winW);
-      const next = page === 0 ? 'funu' : 'mumu';
-      setPet(next);
+      const next = pets[page];
+      if (next) setActivePetId(next.id);
     },
-    [winW]
+    [winW, pets]
   );
 
-  const onRequestIcon = useCallback(async (pid) => {
-    try {
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          '許可が必要です',
-          '写真ライブラリへのアクセスを許可してください。'
-        );
-        return;
-      }
+  const onRequestIcon = useCallback(
+    async (pid) => {
+      try {
+        const { status } =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert(
+            '許可が必要です',
+            '写真ライブラリへのアクセスを許可してください。'
+          );
+          return;
+        }
 
-      const res = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.85,
-        allowsEditing: true,
-        aspect: [1, 1],
-      });
+        const res = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          quality: 0.85,
+          allowsEditing: true,
+          aspect: [1, 1],
+        });
 
-      if (res.canceled) return;
-      if (!documentDirectory) {
-        Alert.alert(
-          '保存できません',
-          'アプリのドキュメント領域を利用できません。'
-        );
-        return;
+        if (res.canceled) return;
+        if (!documentDirectory) {
+          Alert.alert(
+            '保存できません',
+            'アプリのドキュメント領域を利用できません。'
+          );
+          return;
+        }
+        const uri = res.assets[0].uri;
+        const rawExt = uri.split('.').pop()?.split('?')[0] || 'jpg';
+        const ext = /^[a-zA-Z0-9]+$/.test(rawExt) ? rawExt : 'jpg';
+        const dest = `${documentDirectory}pet_${pid}_${Date.now()}.${ext}`;
+        await copyAsync({ from: uri, to: dest });
+        await updatePet(pid, { icon_uri: dest });
+        await refreshPets();
+      } catch (e) {
+        Alert.alert('画像の保存に失敗しました', String(e?.message ?? e));
       }
-      const uri = res.assets[0].uri;
-      const rawExt = uri.split('.').pop()?.split('?')[0] || 'jpg';
-      const ext = /^[a-zA-Z0-9]+$/.test(rawExt) ? rawExt : 'jpg';
-      const dest = `${documentDirectory}pet_${pid}_${Date.now()}.${ext}`;
-      await copyAsync({ from: uri, to: dest });
-      const key =
-        pid === 'funu' ? SETTINGS_KEYS.ICON_FUNU : SETTINGS_KEYS.ICON_MUMU;
-      await setSetting(key, dest);
-      if (pid === 'funu') setIconFunu(dest);
-      else setIconMumu(dest);
-    } catch (e) {
-      Alert.alert('画像の保存に失敗しました', String(e?.message ?? e));
-    }
-  }, []);
+    },
+    [refreshPets]
+  );
 
   const padTop = Math.max(insets.top, 8);
 
@@ -185,18 +176,25 @@ export function InputScreen() {
         ) : null}
 
         <View style={styles.padded}>
-          <PetHeader
-            activePet={pet}
-            onSelectPet={goToPet}
-            iconFunuUri={iconFunu}
-            iconMumuUri={iconMumu}
-            onRequestIcon={onRequestIcon}
-          />
+          {pets.length > 0 ? (
+            <PetHeader
+              pets={pets}
+              activePetId={activePetId}
+              onSelectPet={goToPet}
+              onRequestIcon={onRequestIcon}
+            />
+          ) : (
+            <Text style={styles.emptyPets}>
+              個体がありません。データタブで追加してください。
+            </Text>
+          )}
         </View>
 
-        <Text style={[styles.swipeHint, styles.padded]}>
-          左右にスワイプして個体を切り替えられます
-        </Text>
+        {pets.length > 1 ? (
+          <Text style={[styles.swipeHint, styles.padded]}>
+            左右にスワイプして個体を切り替えられます
+          </Text>
+        ) : null}
 
         <ScrollView
           ref={pagerRef}
@@ -208,22 +206,17 @@ export function InputScreen() {
           nestedScrollEnabled
           style={styles.pager}
         >
-          <View style={[styles.page, { width: winW }]}>
-            <View style={styles.pageInner}>
-              <PetObservationCard
-                petId="funu"
-                onLogChanged={refreshCareGaps}
-              />
+          {pets.map((pet) => (
+            <View key={pet.id} style={[styles.page, { width: winW }]}>
+              <View style={styles.pageInner}>
+                <PetObservationCard
+                  petId={pet.id}
+                  petName={pet.name}
+                  onLogChanged={refreshCareGaps}
+                />
+              </View>
             </View>
-          </View>
-          <View style={[styles.page, { width: winW }]}>
-            <View style={styles.pageInner}>
-              <PetObservationCard
-                petId="mumu"
-                onLogChanged={refreshCareGaps}
-              />
-            </View>
-          </View>
+          ))}
         </ScrollView>
 
         <View style={styles.padded}>
@@ -274,6 +267,13 @@ const styles = StyleSheet.create({
     color: FG,
     opacity: 0.85,
     lineHeight: 19,
+  },
+  emptyPets: {
+    fontSize: 14,
+    color: FG,
+    opacity: 0.7,
+    marginBottom: 16,
+    lineHeight: 20,
   },
   swipeHint: {
     fontSize: 12,

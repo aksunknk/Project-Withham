@@ -2,10 +2,12 @@ import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -25,6 +27,11 @@ import {
   parseBackupJson,
 } from '../database/backup';
 import {
+  createPet,
+  listPets,
+  updatePet,
+} from '../database/db';
+import {
   getNotificationPrefs,
   requestNotificationPermissions,
   rescheduleAllReminders,
@@ -43,6 +50,10 @@ export function SettingsScreen() {
   const [busy, setBusy] = useState(false);
   const [notifyMaintenance, setNotifyMaintenance] = useState(true);
   const [notifyDaily, setNotifyDaily] = useState(true);
+  const [pets, setPets] = useState([]);
+  const [petModal, setPetModal] = useState(false);
+  const [editingPetId, setEditingPetId] = useState(null);
+  const [petNameDraft, setPetNameDraft] = useState('');
 
   const loadPrefs = useCallback(async () => {
     try {
@@ -54,11 +65,65 @@ export function SettingsScreen() {
     }
   }, []);
 
+  const loadPets = useCallback(async () => {
+    try {
+      setPets(await listPets(true));
+    } catch (e) {
+      console.warn('[SettingsScreen pets]', e);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       loadPrefs();
-    }, [loadPrefs])
+      loadPets();
+    }, [loadPrefs, loadPets])
   );
+
+  const openNewPet = () => {
+    setEditingPetId(null);
+    setPetNameDraft('');
+    setPetModal(true);
+  };
+
+  const openEditPet = (pet) => {
+    setEditingPetId(pet.id);
+    setPetNameDraft(pet.name);
+    setPetModal(true);
+  };
+
+  const savePetModal = () => {
+    run(async () => {
+      if (editingPetId) {
+        await updatePet(editingPetId, { name: petNameDraft });
+      } else {
+        await createPet({ name: petNameDraft });
+      }
+      setPetModal(false);
+      await loadPets();
+    });
+  };
+
+  const toggleRetire = (pet) => {
+    const next = !pet.retired;
+    Alert.alert(
+      next ? '個体を引退させる' : '個体を復帰させる',
+      next
+        ? `${pet.name} を記録対象から外します（データは残ります）。`
+        : `${pet.name} を再び記録対象にします。`,
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: next ? '引退' : '復帰',
+          onPress: () =>
+            run(async () => {
+              await updatePet(pet.id, { retired: next });
+              await loadPets();
+            }),
+        },
+      ]
+    );
+  };
 
   const run = useCallback(async (fn) => {
     setBusy(true);
@@ -213,9 +278,47 @@ export function SettingsScreen() {
       >
         <Text style={styles.headline}>データ</Text>
         <Text style={styles.lead}>
-          通知とバックアップの設定です。機種変更前に JSON
+          個体・通知・バックアップの設定です。機種変更前に JSON
           バックアップを残してください。
         </Text>
+
+        <Text style={styles.section}>個体</Text>
+        <View style={styles.card}>
+          {pets.map((pet) => (
+            <View key={pet.id} style={styles.petRow}>
+              <View style={styles.switchCopy}>
+                <Text style={styles.btnText}>
+                  {pet.name}
+                  {pet.retired ? '（引退）' : ''}
+                </Text>
+                <Text style={styles.btnSub}>ID: {pet.id}</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => openEditPet(pet)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.linkBtn}>改名</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => toggleRetire(pet)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.linkBtn}>
+                  {pet.retired ? '復帰' : '引退'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+          <TouchableOpacity
+            style={styles.btn}
+            onPress={openNewPet}
+            disabled={busy}
+            activeOpacity={0.88}
+          >
+            <Text style={styles.btnText}>個体を追加</Text>
+            <Text style={styles.btnSub}>新しい同居個体を登録</Text>
+          </TouchableOpacity>
+        </View>
 
         <Text style={styles.section}>通知</Text>
         <View style={styles.card}>
@@ -309,6 +412,39 @@ export function SettingsScreen() {
           </View>
         ) : null}
       </ScrollView>
+
+      <Modal
+        visible={petModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPetModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>
+              {editingPetId ? '個体名を変更' : '個体を追加'}
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              value={petNameDraft}
+              onChangeText={setPetNameDraft}
+              placeholder="名前"
+              placeholderTextColor={`${FG}88`}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalBtnGhost}
+                onPress={() => setPetModal(false)}
+              >
+                <Text style={styles.modalBtnGhostText}>キャンセル</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalBtn} onPress={savePetModal}>
+                <Text style={styles.modalBtnText}>保存</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -394,5 +530,72 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: FG,
     opacity: 0.75,
+  },
+  petRow: {
+    backgroundColor: BG,
+    borderRadius: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  linkBtn: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: FG,
+    textDecorationLine: 'underline',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(74, 74, 74, 0.35)',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  modalCard: {
+    backgroundColor: BG,
+    borderRadius: R,
+    padding: 18,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: FG,
+    marginBottom: 12,
+  },
+  modalInput: {
+    backgroundColor: CARD,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    fontSize: 16,
+    color: FG,
+    marginBottom: 14,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  modalBtn: {
+    backgroundColor: FG,
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+  },
+  modalBtnText: {
+    color: BG,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  modalBtnGhost: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  modalBtnGhostText: {
+    color: FG,
+    fontSize: 14,
+    fontWeight: '600',
+    opacity: 0.7,
   },
 });

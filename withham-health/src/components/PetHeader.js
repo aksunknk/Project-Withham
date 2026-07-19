@@ -1,91 +1,69 @@
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 const BG = '#FDFBF7';
 const CARD = '#F5EFE6';
 const FG = '#4A4A4A';
 const R = 22;
 
+/**
+ * @param {{
+ *   pets: Array<{ id: string, name: string, icon_uri?: string|null }>,
+ *   activePetId: string,
+ *   onSelectPet: (id: string) => void,
+ *   onRequestIcon: (id: string) => void,
+ * }} props
+ */
 export function PetHeader({
-  activePet,
+  pets,
+  activePetId,
   onSelectPet,
-  iconFunuUri,
-  iconMumuUri,
   onRequestIcon,
 }) {
   return (
-    <View style={styles.segment}>
-      <View
-        style={[
-          styles.segHalf,
-          activePet === 'funu' && styles.segHalfOn,
-        ]}
-      >
-        <TouchableOpacity
-          style={styles.roundIconBtn}
-          onPress={() => onRequestIcon('funu')}
-          activeOpacity={0.85}
-          accessibilityLabel="ふぬのアイコンを変更"
-        >
-          {iconFunuUri ? (
-            <Image source={{ uri: iconFunuUri }} style={styles.iconImg} />
-          ) : (
-            <View style={styles.iconPlaceholder}>
-              <Text style={styles.iconPhText}>ふ</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.labelArea}
-          onPress={() => onSelectPet('funu')}
-          activeOpacity={0.88}
-        >
-          <Text
-            style={[
-              styles.segLabel,
-              activePet === 'funu' && styles.segLabelOn,
-            ]}
-          >
-            ふぬ
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <View
-        style={[
-          styles.segHalf,
-          activePet === 'mumu' && styles.segHalfOn,
-        ]}
-      >
-        <TouchableOpacity
-          style={styles.roundIconBtn}
-          onPress={() => onRequestIcon('mumu')}
-          activeOpacity={0.85}
-          accessibilityLabel="むむのアイコンを変更"
-        >
-          {iconMumuUri ? (
-            <Image source={{ uri: iconMumuUri }} style={styles.iconImg} />
-          ) : (
-            <View style={styles.iconPlaceholder}>
-              <Text style={styles.iconPhText}>む</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.labelArea}
-          onPress={() => onSelectPet('mumu')}
-          activeOpacity={0.88}
-        >
-          <Text
-            style={[
-              styles.segLabel,
-              activePet === 'mumu' && styles.segLabelOn,
-            ]}
-          >
-            むむ
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.segment}
+    >
+      {pets.map((pet) => {
+        const on = activePetId === pet.id;
+        const initial = (pet.name || '?').slice(0, 1);
+        return (
+          <View key={pet.id} style={[styles.segHalf, on && styles.segHalfOn]}>
+            <TouchableOpacity
+              style={styles.roundIconBtn}
+              onPress={() => onRequestIcon(pet.id)}
+              activeOpacity={0.85}
+              accessibilityLabel={`${pet.name}のアイコンを変更`}
+            >
+              {pet.icon_uri ? (
+                <Image source={{ uri: pet.icon_uri }} style={styles.iconImg} />
+              ) : (
+                <View style={styles.iconPlaceholder}>
+                  <Text style={styles.iconPhText}>{initial}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.labelArea}
+              onPress={() => onSelectPet(pet.id)}
+              activeOpacity={0.88}
+            >
+              <Text style={[styles.segLabel, on && styles.segLabelOn]}>
+                {pet.name}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        );
+      })}
+    </ScrollView>
   );
 }
 
@@ -97,15 +75,16 @@ const styles = StyleSheet.create({
     padding: 6,
     marginBottom: 18,
     gap: 6,
+    minWidth: '100%',
   },
   segHalf: {
-    flex: 1,
+    minWidth: 140,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 20,
     paddingVertical: 8,
-    paddingHorizontal: 6,
+    paddingHorizontal: 10,
     gap: 8,
   },
   segHalfOn: {
@@ -135,10 +114,11 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   labelArea: {
-    flex: 1,
+    flexShrink: 1,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 44,
+    paddingRight: 4,
   },
   segLabel: {
     fontSize: 17,

@@ -12,8 +12,8 @@ import { getInsightRange } from '../utils/insightRange';
 
 const CARD = '#F5EFE6';
 const FG = '#4A4A4A';
-const FUNU_COLOR = (o = 1) => `rgba(74, 74, 74, ${o})`;
-const MUMU_COLOR = (o = 1) => `rgba(160, 130, 100, ${o})`;
+const COLOR_A = (o = 1) => `rgba(74, 74, 74, ${o})`;
+const COLOR_B = (o = 1) => `rgba(160, 130, 100, ${o})`;
 
 function formatChartLabel(dateStr) {
   const p = String(dateStr ?? '').split('-');
@@ -21,55 +21,68 @@ function formatChartLabel(dateStr) {
 }
 
 /**
- * 同日に両方の体重がある日付だけを重ねて表示。
+ * 先頭2個体の同日体重を重ねて表示。
+ * @param {{ pets: Array<{id:string,name:string}>, rangeKey: string, reloadToken?: number }} props
  */
-export function CompareWeightChart({ rangeKey, reloadToken = 0 }) {
+export function CompareWeightChart({ pets, rangeKey, reloadToken = 0 }) {
   const { width: winW } = useWindowDimensions();
   const [loading, setLoading] = useState(true);
   const [labels, setLabels] = useState([]);
-  const [funuData, setFunuData] = useState([]);
-  const [mumuData, setMumuData] = useState([]);
+  const [seriesA, setSeriesA] = useState([]);
+  const [seriesB, setSeriesB] = useState([]);
+  const petA = pets[0] ?? null;
+  const petB = pets[1] ?? null;
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      if (!petA || !petB) {
+        setLabels([]);
+        setSeriesA([]);
+        setSeriesB([]);
+        return;
+      }
       const { chartLimit } = getInsightRange(rangeKey);
-      const [funu, mumu] = await Promise.all([
-        getWeightHistory('funu', chartLimit),
-        getWeightHistory('mumu', chartLimit),
+      const [a, b] = await Promise.all([
+        getWeightHistory(petA.id, chartLimit),
+        getWeightHistory(petB.id, chartLimit),
       ]);
-      const mapF = new Map(funu.map((r) => [r.date, Number(r.weight)]));
-      const mapM = new Map(mumu.map((r) => [r.date, Number(r.weight)]));
-      const common = [...mapF.keys()]
-        .filter((d) => mapM.has(d))
-        .sort();
+      const mapA = new Map(a.map((r) => [r.date, Number(r.weight)]));
+      const mapB = new Map(b.map((r) => [r.date, Number(r.weight)]));
+      const common = [...mapA.keys()].filter((d) => mapB.has(d)).sort();
       setLabels(common.map(formatChartLabel));
-      setFunuData(common.map((d) => mapF.get(d)));
-      setMumuData(common.map((d) => mapM.get(d)));
+      setSeriesA(common.map((d) => mapA.get(d)));
+      setSeriesB(common.map((d) => mapB.get(d)));
     } catch (e) {
       console.error('[CompareWeightChart]', e);
       setLabels([]);
-      setFunuData([]);
-      setMumuData([]);
+      setSeriesA([]);
+      setSeriesB([]);
     } finally {
       setLoading(false);
     }
-  }, [rangeKey]);
+  }, [rangeKey, petA?.id, petB?.id]);
 
   useEffect(() => {
     load();
   }, [load, reloadToken]);
 
   const chartW = Math.max(260, winW - 40 - 36);
-  const show = funuData.length >= 2;
+  const show = seriesA.length >= 2;
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>ふぬ × むむ 体重比較</Text>
-      <Text style={styles.caption}>
-        同じ日に両方の体重がある点だけを重ねて表示します。
+      <Text style={styles.title}>
+        {petA && petB
+          ? `${petA.name} × ${petB.name} 体重比較`
+          : '個体比較'}
       </Text>
-      {loading ? (
+      <Text style={styles.caption}>
+        有効な個体のうち先頭2匹について、同日計測だけを重ねて表示します。
+      </Text>
+      {!petA || !petB ? (
+        <Text style={styles.hint}>比較には有効な個体が2匹以上必要です。</Text>
+      ) : loading ? (
         <ActivityIndicator color={FG} style={styles.loader} />
       ) : show ? (
         <>
@@ -77,18 +90,10 @@ export function CompareWeightChart({ rangeKey, reloadToken = 0 }) {
             data={{
               labels,
               datasets: [
-                {
-                  data: funuData,
-                  color: FUNU_COLOR,
-                  strokeWidth: 2,
-                },
-                {
-                  data: mumuData,
-                  color: MUMU_COLOR,
-                  strokeWidth: 2,
-                },
+                { data: seriesA, color: COLOR_A, strokeWidth: 2 },
+                { data: seriesB, color: COLOR_B, strokeWidth: 2 },
               ],
-              legend: ['ふぬ', 'むむ'],
+              legend: [petA.name, petB.name],
             }}
             width={chartW}
             height={210}
@@ -114,13 +119,11 @@ export function CompareWeightChart({ rangeKey, reloadToken = 0 }) {
           <View style={styles.legendRow}>
             <View style={styles.legendItem}>
               <View style={[styles.swatch, { backgroundColor: FG }]} />
-              <Text style={styles.legendText}>ふぬ</Text>
+              <Text style={styles.legendText}>{petA.name}</Text>
             </View>
             <View style={styles.legendItem}>
-              <View
-                style={[styles.swatch, { backgroundColor: '#A08264' }]}
-              />
-              <Text style={styles.legendText}>むむ</Text>
+              <View style={[styles.swatch, { backgroundColor: '#A08264' }]} />
+              <Text style={styles.legendText}>{petB.name}</Text>
             </View>
           </View>
         </>

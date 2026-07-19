@@ -15,7 +15,8 @@ export const SETTINGS_KEYS = {
 };
 
 const SCHEMA_KEY = 'schema_version';
-const SCHEMA_VER = '3';
+const SCHEMA_VER = '4';
+const DAILY_LOGS_FLEX_KEY = 'daily_logs_flexible_pet';
 
 const DAILY_LOGS_DDL = `
   CREATE TABLE daily_logs (
@@ -29,12 +30,23 @@ const DAILY_LOGS_DDL = `
     door_lock_checked INTEGER NOT NULL DEFAULT 0,
     meal_id INTEGER,
     memo TEXT,
-    CHECK (pet_id IN ('funu', 'mumu')),
+    photo_uri TEXT,
     CHECK (gap_block_checked IN (0, 1)),
     CHECK (door_lock_checked IN (0, 1))
   );
   CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_logs_date_pet
     ON daily_logs (date, pet_id);
+`;
+
+const PETS_DDL = `
+  CREATE TABLE IF NOT EXISTS pets (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    icon_uri TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    retired INTEGER NOT NULL DEFAULT 0,
+    CHECK (retired IN (0, 1))
+  );
 `;
 
 const MAINTENANCE_LOGS_DDL = `
@@ -78,6 +90,161 @@ async function ensureDoorLockColumn(db) {
 }
 
 /**
+ * @param {import('expo-sqlite').SQLiteDatabase} db
+ */
+async function setSchemaVersion(db, ver) {
+  await db.runAsync(
+    `INSERT INTO settings (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    [SCHEMA_KEY, ver]
+  );
+}
+
+/**
+ * @param {import('expo-sqlite').SQLiteDatabase} db
+ */
+async function ensurePetsTableAndSeed(db) {
+  await db.execAsync(PETS_DDL);
+  const row = await db.getFirstAsync(`SELECT COUNT(*) AS c FROM pets`);
+  if (Number(row?.c ?? 0) > 0) return;
+
+  const iconFunu = await db.getFirstAsync(
+    `SELECT value FROM settings WHERE key = ?`,
+    [SETTINGS_KEYS.ICON_FUNU]
+  );
+  const iconMumu = await db.getFirstAsync(
+    `SELECT value FROM settings WHERE key = ?`,
+    [SETTINGS_KEYS.ICON_MUMU]
+  );
+  await db.runAsync(
+    `INSERT INTO pets (id, name, icon_uri, sort_order, retired) VALUES (?, ?, ?, ?, 0)`,
+    ['funu', 'ふぬ', iconFunu?.value ?? null, 0]
+  );
+  await db.runAsync(
+    `INSERT INTO pets (id, name, icon_uri, sort_order, retired) VALUES (?, ?, ?, ?, 0)`,
+    ['mumu', 'むむ', iconMumu?.value ?? null, 1]
+  );
+}
+
+/**
+ * pet_id 制約を外し photo_uri を持つ daily_logs へ移行。
+ * @param {import('expo-sqlite').SQLiteDatabase} db
+ */
+async function ensureDailyLogsV4(db) {
+  const flex = await db.getFirstAsync(
+    `SELECT value FROM settings WHERE key = ?`,
+    [DAILY_LOGS_FLEX_KEY]
+  );
+  const info = await db.getAllAsync(`PRAGMA table_info(daily_logs)`);
+  if (!info || info.length === 0) {
+    await db.execAsync(DAILY_LOGS_DDL);
+    await db.runAsync(
+      `INSERT INTO settings (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      [DAILY_LOGS_FLEX_KEY, '1']
+    );
+    return;
+  }
+  const names = new Set(info.map((c) => c.name));
+  if (names.has('photo_uri')) {
+    if (flex?.value !== '1') {
+      await db.runAsync(
+        `INSERT INTO settings (key, value) VALUES (?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+        [DAILY_LOGS_FLEX_KEY, '1']
+      );
+    }
+    return;
+  }
+
+  await ensureDoorLockColumn(db);
+  const info2 = await db.getAllAsync(`PRAGMA table_info(daily_logs)`);
+  const names2 = new Set((info2 ?? []).map((c) => c.name));
+  const hasPhoto = names2.has('photo_uri');
+  const hasDoor = names2.has('door_lock_checked');
+
+  await db.execAsync(`
+    CREATE TABLE daily_logs_v4 (
+      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      date TEXT NOT NULL,
+      pet_id TEXT NOT NULL,
+      weight REAL,
+      heyanpo_start TEXT,
+      heyanpo_end TEXT,
+      gap_block_checked INTEGER NOT NULL DEFAULT 0,
+      door_lock_checked INTEGER NOT NULL DEFAULT 0,
+      meal_id INTEGER,
+      memo TEXT,
+      photo_uri TEXT,
+      CHECK (gap_block_checked IN (0, 1)),
+      CHECK (door_lock_checked IN (0, 1))
+    );
+  `);
+
+  if (hasPhoto && hasDoor) {
+    await db.execAsync(`
+      INSERT INTO daily_logs_v4 (
+        id, date, pet_id, weight, heyanpo_start, heyanpo_end,
+        gap_block_checked, door_lock_checked, meal_id, memo, photo_uri
+      )
+      SELECT id, date, pet_id, weight, heyanpo_start, heyanpo_end,
+             gap_block_checked, door_lock_checked, meal_id, memo, photo_uri
+      FROM daily_logs
+    `);
+  } else if (hasDoor) {
+    await db.execAsync(`
+      INSERT INTO daily_logs_v4 (
+        id, date, pet_id, weight, heyanpo_start, heyanpo_end,
+        gap_block_checked, door_lock_checked, meal_id, memo, photo_uri
+      )
+      SELECT id, date, pet_id, weight, heyanpo_start, heyanpo_end,
+             gap_block_checked, door_lock_checked, meal_id, memo, NULL
+      FROM daily_logs
+    `);
+  } else {
+    await db.execAsync(`
+      INSERT INTO daily_logs_v4 (
+        id, date, pet_id, weight, heyanpo_start, heyanpo_end,
+        gap_block_checked, door_lock_checked, meal_id, memo, photo_uri
+      )
+      SELECT id, date, pet_id, weight, heyanpo_start, heyanpo_end,
+             gap_block_checked, gap_block_checked, meal_id, memo, NULL
+      FROM daily_logs
+    `);
+  }
+
+  await db.execAsync(`
+    DROP TABLE daily_logs;
+    ALTER TABLE daily_logs_v4 RENAME TO daily_logs;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_logs_date_pet
+      ON daily_logs (date, pet_id);
+  `);
+  await db.runAsync(
+    `INSERT INTO settings (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    [DAILY_LOGS_FLEX_KEY, '1']
+  );
+}
+
+/**
+ * @param {import('expo-sqlite').SQLiteDatabase} db
+ */
+async function ensureMealPinColumns(db) {
+  const info = await db.getAllAsync(`PRAGMA table_info(custom_meals)`);
+  const names = new Set((info ?? []).map((c) => c.name));
+  if (!names.has('pinned')) {
+    await db.execAsync(
+      `ALTER TABLE custom_meals ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0`
+    );
+  }
+  if (!names.has('last_used_at')) {
+    await db.execAsync(
+      `ALTER TABLE custom_meals ADD COLUMN last_used_at TEXT`
+    );
+  }
+}
+
+/**
  * SQLite を開き、スキーマを構築する。
  */
 export async function initDB() {
@@ -103,29 +270,13 @@ export async function initDB() {
   );
   const currentVer = verRow?.value ?? '';
 
-  if (currentVer !== SCHEMA_VER) {
-    if (currentVer === '2') {
-      await ensureMaintenanceLogsTable(db);
-      await ensureDoorLockColumn(db);
-      await db.runAsync(
-        `INSERT INTO settings (key, value) VALUES (?, ?)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-        [SCHEMA_KEY, SCHEMA_VER]
-      );
-    } else {
-      await db.execAsync(`
-        PRAGMA foreign_keys = OFF;
-        DROP TABLE IF EXISTS daily_logs;
-      `);
-      await db.execAsync(DAILY_LOGS_DDL);
-      await ensureMaintenanceLogsTable(db);
-      await db.runAsync(
-        `INSERT INTO settings (key, value) VALUES (?, ?)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-        [SCHEMA_KEY, SCHEMA_VER]
-      );
-    }
-  } else {
+  if (currentVer === '' || currentVer === '0') {
+    await db.execAsync(DAILY_LOGS_DDL);
+    await ensureMaintenanceLogsTable(db);
+  } else if (currentVer === '2') {
+    await ensureMaintenanceLogsTable(db);
+    await ensureDoorLockColumn(db);
+  } else if (currentVer === '3' || currentVer === '4') {
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS daily_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -137,7 +288,6 @@ export async function initDB() {
         gap_block_checked INTEGER NOT NULL DEFAULT 0,
         meal_id INTEGER,
         memo TEXT,
-        CHECK (pet_id IN ('funu', 'mumu')),
         CHECK (gap_block_checked IN (0, 1))
       );
       CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_logs_date_pet
@@ -145,7 +295,19 @@ export async function initDB() {
     `);
     await ensureDoorLockColumn(db);
     await ensureMaintenanceLogsTable(db);
+  } else {
+    await db.execAsync(`
+      PRAGMA foreign_keys = OFF;
+      DROP TABLE IF EXISTS daily_logs;
+    `);
+    await db.execAsync(DAILY_LOGS_DDL);
+    await ensureMaintenanceLogsTable(db);
   }
+
+  await ensurePetsTableAndSeed(db);
+  await ensureDailyLogsV4(db);
+  await ensureMealPinColumns(db);
+  await setSchemaVersion(db, SCHEMA_VER);
 
   return db;
 }
@@ -174,36 +336,35 @@ export function parseLocalDateString(dateStr) {
 }
 
 /**
- * @param {'funu'|'mumu'} pet_id
+ * @param {string} pet_id
  * @param {string} date YYYY-MM-DD
  */
 export async function getLogByDate(pet_id, date) {
   const db = getDatabase();
   const row = await db.getFirstAsync(
     `SELECT id, date, pet_id, weight, heyanpo_start, heyanpo_end,
-            gap_block_checked, door_lock_checked, meal_id, memo
+            gap_block_checked, door_lock_checked, meal_id, memo, photo_uri
      FROM daily_logs WHERE date = ? AND pet_id = ?`,
     [date, pet_id]
   );
   return row ?? null;
 }
 
-/** @param {'funu'|'mumu'} pet_id */
+/** @param {string} pet_id */
 export async function getTodayLog(pet_id) {
   return getLogByDate(pet_id, getLocalDateString());
 }
 
 /**
  * 本日の体重未記録 / 安全確認未完了を個体ごとに返す。
- * @returns {Promise<Array<{ pet_id: 'funu'|'mumu', label: string, missingWeight: boolean, missingSafety: boolean }>>}
+ * @returns {Promise<Array<{ pet_id: string, label: string, missingWeight: boolean, missingSafety: boolean }>>}
  */
 export async function getTodayCareGaps() {
   const today = getLocalDateString();
-  /** @type {Array<'funu'|'mumu'>} */
-  const pets = ['funu', 'mumu'];
+  const pets = await listActivePets();
   const out = [];
-  for (const pet_id of pets) {
-    const row = await getLogByDate(pet_id, today);
+  for (const pet of pets) {
+    const row = await getLogByDate(pet.id, today);
     const missingWeight = row == null || row.weight == null;
     const gapOn = row?.gap_block_checked === 1;
     const doorRaw = row?.door_lock_checked;
@@ -213,8 +374,8 @@ export async function getTodayCareGaps() {
     const missingSafety = !sealed;
     if (missingWeight || missingSafety) {
       out.push({
-        pet_id,
-        label: pet_id === 'funu' ? 'ふぬ' : 'むむ',
+        pet_id: pet.id,
+        label: pet.name,
         missingWeight,
         missingSafety,
       });
@@ -224,7 +385,7 @@ export async function getTodayCareGaps() {
 }
 
 /**
- * @param {'funu'|'mumu'} pet_id
+ * @param {string} pet_id
  * @param {object} payload
  * @param {string} [payload.date]
  * @param {number|null} [payload.weight]
@@ -234,6 +395,7 @@ export async function getTodayCareGaps() {
  * @param {0|1|boolean} [payload.door_lock_checked]
  * @param {number|null} [payload.meal_id]
  * @param {string|null} [payload.memo]
+ * @param {string|null} [payload.photo_uri]
  */
 export async function upsertDailyLog(pet_id, payload) {
   const db = getDatabase();
@@ -256,13 +418,17 @@ export async function upsertDailyLog(pet_id, payload) {
       ? null
       : Number(payload.meal_id);
   const memo = payload.memo ?? null;
+  const photo_uri =
+    payload.photo_uri == null || payload.photo_uri === ''
+      ? null
+      : String(payload.photo_uri);
 
   await db.runAsync(
     `INSERT INTO daily_logs (
        date, pet_id, weight, heyanpo_start, heyanpo_end,
-       gap_block_checked, door_lock_checked, meal_id, memo
+       gap_block_checked, door_lock_checked, meal_id, memo, photo_uri
      )
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(date, pet_id) DO UPDATE SET
        weight = excluded.weight,
        heyanpo_start = excluded.heyanpo_start,
@@ -270,8 +436,20 @@ export async function upsertDailyLog(pet_id, payload) {
        gap_block_checked = excluded.gap_block_checked,
        door_lock_checked = excluded.door_lock_checked,
        meal_id = excluded.meal_id,
-       memo = excluded.memo`,
-    [date, pet_id, weight, heyanpo_start, heyanpo_end, gap, door, meal_id, memo]
+       memo = excluded.memo,
+       photo_uri = excluded.photo_uri`,
+    [
+      date,
+      pet_id,
+      weight,
+      heyanpo_start,
+      heyanpo_end,
+      gap,
+      door,
+      meal_id,
+      memo,
+      photo_uri,
+    ]
   );
 }
 
@@ -285,6 +463,7 @@ function existingRowToPayload(row) {
       door_lock_checked: 0,
       meal_id: null,
       memo: null,
+      photo_uri: null,
     };
   }
   const gap = row.gap_block_checked === 1 ? 1 : 0;
@@ -299,6 +478,7 @@ function existingRowToPayload(row) {
     door_lock_checked: door,
     meal_id: row.meal_id != null ? Number(row.meal_id) : null,
     memo: row.memo ?? null,
+    photo_uri: row.photo_uri ?? null,
   };
 }
 
@@ -347,7 +527,8 @@ export async function pruneEmptyDailyLog(pet_id, date) {
     !p.gap_block_checked &&
     !p.door_lock_checked &&
     p.meal_id == null &&
-    (p.memo == null || String(p.memo).trim() === '');
+    (p.memo == null || String(p.memo).trim() === '') &&
+    (p.photo_uri == null || String(p.photo_uri).trim() === '');
   if (empty) await deleteDailyLog(pet_id, date);
 }
 
@@ -528,7 +709,7 @@ export async function getMonthDayMarks(pet_id, year, month) {
   const end = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
   const rows = await db.getAllAsync(
     `SELECT date, weight, heyanpo_start, heyanpo_end,
-            gap_block_checked, door_lock_checked, meal_id, memo
+            gap_block_checked, door_lock_checked, meal_id, memo, photo_uri
      FROM daily_logs
      WHERE pet_id = ? AND date >= ? AND date <= ?`,
     [pet_id, start, end]
@@ -541,10 +722,11 @@ export async function getMonthDayMarks(pet_id, year, month) {
       lengthTrim(r.heyanpo_start) > 0 || lengthTrim(r.heyanpo_end) > 0;
     const hasMemo = lengthTrim(r.memo) > 0;
     const hasMeal = r.meal_id != null;
+    const hasPhoto = lengthTrim(r.photo_uri) > 0;
     const hasSafety =
       r.gap_block_checked === 1 || r.door_lock_checked === 1;
     const hasActivity =
-      hasWeight || hasHey || hasMemo || hasMeal || hasSafety;
+      hasWeight || hasHey || hasMemo || hasMeal || hasSafety || hasPhoto;
     marks[r.date] = {
       hasWeight,
       hasActivity,
@@ -591,18 +773,150 @@ export async function addCustomMeal(name) {
   const trimmed = String(name ?? '').trim();
   if (!trimmed) throw new Error('メニュー名が空です');
   const result = await db.runAsync(
-    `INSERT INTO custom_meals (name) VALUES (?)`,
+    `INSERT INTO custom_meals (name, pinned, last_used_at) VALUES (?, 0, NULL)`,
     [trimmed]
   );
   return Number(result.lastInsertRowId);
 }
 
+/** ピン留め優先 → 最近使用 → 名前 */
 export async function getCustomMeals() {
   const db = getDatabase();
   const rows = await db.getAllAsync(
-    `SELECT id, name FROM custom_meals ORDER BY name ASC`
+    `SELECT id, name, pinned, last_used_at FROM custom_meals
+     ORDER BY pinned DESC,
+              CASE WHEN last_used_at IS NULL THEN 1 ELSE 0 END,
+              last_used_at DESC,
+              name ASC`
+  );
+  return (rows ?? []).map((r) => ({
+    id: Number(r.id),
+    name: r.name,
+    pinned: r.pinned === 1,
+    last_used_at: r.last_used_at ?? null,
+  }));
+}
+
+/** @param {number} mealId */
+export async function touchMealUsed(mealId) {
+  const db = getDatabase();
+  await db.runAsync(
+    `UPDATE custom_meals SET last_used_at = ? WHERE id = ?`,
+    [new Date().toISOString(), Number(mealId)]
+  );
+}
+
+/** @param {number} mealId */
+export async function toggleMealPinned(mealId) {
+  const db = getDatabase();
+  const row = await db.getFirstAsync(
+    `SELECT pinned FROM custom_meals WHERE id = ?`,
+    [Number(mealId)]
+  );
+  if (!row) throw new Error('メニューが見つかりません');
+  const next = row.pinned === 1 ? 0 : 1;
+  await db.runAsync(`UPDATE custom_meals SET pinned = ? WHERE id = ?`, [
+    next,
+    Number(mealId),
+  ]);
+  return next === 1;
+}
+
+/**
+ * 写真付き日次ログ（新しい日付順）
+ * @param {string} pet_id
+ * @param {number} limit
+ */
+export async function getPhotoHistory(pet_id, limit = 60) {
+  const db = getDatabase();
+  const rows = await db.getAllAsync(
+    `SELECT date, photo_uri FROM daily_logs
+     WHERE pet_id = ?
+       AND length(trim(coalesce(photo_uri, ''))) > 0
+     ORDER BY date DESC
+     LIMIT ?`,
+    [pet_id, limit]
   );
   return rows ?? [];
+}
+
+/** @param {boolean} [includeRetired=false] */
+export async function listPets(includeRetired = false) {
+  const db = getDatabase();
+  const rows = includeRetired
+    ? await db.getAllAsync(
+        `SELECT id, name, icon_uri, sort_order, retired FROM pets
+         ORDER BY retired ASC, sort_order ASC, name ASC`
+      )
+    : await db.getAllAsync(
+        `SELECT id, name, icon_uri, sort_order, retired FROM pets
+         WHERE retired = 0
+         ORDER BY sort_order ASC, name ASC`
+      );
+  return (rows ?? []).map((r) => ({
+    id: String(r.id),
+    name: String(r.name),
+    icon_uri: r.icon_uri ?? null,
+    sort_order: Number(r.sort_order ?? 0),
+    retired: r.retired === 1,
+  }));
+}
+
+export async function listActivePets() {
+  return listPets(false);
+}
+
+/**
+ * @param {{ name: string, icon_uri?: string|null }} input
+ */
+export async function createPet(input) {
+  const db = getDatabase();
+  const name = String(input.name ?? '').trim();
+  if (!name) throw new Error('名前が空です');
+  const id = `pet_${Date.now().toString(36)}`;
+  const maxRow = await db.getFirstAsync(
+    `SELECT MAX(sort_order) AS m FROM pets WHERE retired = 0`
+  );
+  const sort_order = Number(maxRow?.m ?? -1) + 1;
+  await db.runAsync(
+    `INSERT INTO pets (id, name, icon_uri, sort_order, retired) VALUES (?, ?, ?, ?, 0)`,
+    [id, name, input.icon_uri ?? null, sort_order]
+  );
+  return id;
+}
+
+/**
+ * @param {string} id
+ * @param {{ name?: string, icon_uri?: string|null, retired?: boolean, sort_order?: number }} patch
+ */
+export async function updatePet(id, patch) {
+  const db = getDatabase();
+  const row = await db.getFirstAsync(
+    `SELECT id, name, icon_uri, sort_order, retired FROM pets WHERE id = ?`,
+    [id]
+  );
+  if (!row) throw new Error('個体が見つかりません');
+  const name =
+    patch.name !== undefined ? String(patch.name).trim() : row.name;
+  if (!name) throw new Error('名前が空です');
+  const icon_uri =
+    patch.icon_uri !== undefined ? patch.icon_uri : row.icon_uri;
+  const retired =
+    patch.retired !== undefined ? (patch.retired ? 1 : 0) : row.retired;
+  const sort_order =
+    patch.sort_order !== undefined
+      ? Number(patch.sort_order)
+      : Number(row.sort_order);
+  await db.runAsync(
+    `UPDATE pets SET name = ?, icon_uri = ?, retired = ?, sort_order = ? WHERE id = ?`,
+    [name, icon_uri ?? null, retired, sort_order, id]
+  );
+}
+
+/** @param {string} id */
+export async function getPet(id) {
+  const pets = await listPets(true);
+  return pets.find((p) => p.id === id) ?? null;
 }
 
 /**

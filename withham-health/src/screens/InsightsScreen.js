@@ -28,6 +28,7 @@ import {
   getMealServeCountsInDateRange,
   getMemoHistory,
   getWeightHistory,
+  listActivePets,
   mergeUpsertDailyLog,
   parseLocalDateString,
 } from '../database/db';
@@ -126,7 +127,7 @@ function HistoryModal({ visible, title, onClose, children }) {
   );
 }
 
-function PetInsightBlock({ petId, rangeKey, winW, reloadToken }) {
+function PetInsightBlock({ petId, petName, rangeKey, winW, reloadToken }) {
   const range = getInsightRange(rangeKey);
   const [weights, setWeights] = useState([]);
   const [heyanpoDurations, setHeyanpoDurations] = useState([]);
@@ -290,7 +291,7 @@ function PetInsightBlock({ petId, rangeKey, winW, reloadToken }) {
   const heyPoints = heyanpoDurations.map((r) => r.minutes);
   const showHeyChart = heyPoints.length >= 2;
 
-  const label = petId === 'funu' ? 'ふぬ' : 'むむ';
+  const label = petName || petId;
   const endStr = getLocalDateString();
   const startStr =
     range.days != null ? getInsightRangeStartDate(range.days) : '開始〜';
@@ -611,11 +612,15 @@ export function InsightsScreen() {
   const { width: winW } = useWindowDimensions();
   const [rangeKey, setRangeKey] = useState('short');
   const [reloadToken, setReloadToken] = useState(0);
+  const [pets, setPets] = useState([]);
   const skipFirstFocus = useRef(true);
   const activeRange = getInsightRange(rangeKey);
 
   useFocusEffect(
     useCallback(() => {
+      listActivePets()
+        .then(setPets)
+        .catch((e) => console.error('[Insights pets]', e));
       if (skipFirstFocus.current) {
         skipFirstFocus.current = false;
         return;
@@ -661,21 +666,26 @@ export function InsightsScreen() {
 
         <View style={styles.padded}>
           <CompareWeightChart
+            pets={pets}
             rangeKey={rangeKey}
             reloadToken={reloadToken}
           />
-          <PetInsightBlock
-            petId="funu"
-            rangeKey={rangeKey}
-            winW={winW}
-            reloadToken={reloadToken}
-          />
-          <PetInsightBlock
-            petId="mumu"
-            rangeKey={rangeKey}
-            winW={winW}
-            reloadToken={reloadToken}
-          />
+          {pets.length === 0 ? (
+            <Text style={styles.hint}>
+              有効な個体がありません。データタブで追加してください。
+            </Text>
+          ) : (
+            pets.map((pet) => (
+              <PetInsightBlock
+                key={pet.id}
+                petId={pet.id}
+                petName={pet.name}
+                rangeKey={rangeKey}
+                winW={winW}
+                reloadToken={reloadToken}
+              />
+            ))
+          )}
         </View>
       </ScrollView>
     </View>

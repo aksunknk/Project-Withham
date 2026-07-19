@@ -3,11 +3,12 @@ import {
   getCustomMeals,
   getDatabase,
   getLocalDateString,
+  listPets,
   SETTINGS_KEYS,
 } from './db';
 
 export const BACKUP_FORMAT = 'withham-health-backup';
-export const BACKUP_VERSION = 1;
+export const BACKUP_VERSION = 2;
 
 const SCHEMA_KEY = 'schema_version';
 
@@ -16,11 +17,11 @@ const SCHEMA_KEY = 'schema_version';
  */
 export async function buildBackupObject() {
   const db = getDatabase();
-  const [daily_logs, custom_meals, maintenance_logs, settings] =
+  const [daily_logs, custom_meals, maintenance_logs, settings, pets] =
     await Promise.all([
       db.getAllAsync(
         `SELECT date, pet_id, weight, heyanpo_start, heyanpo_end,
-                gap_block_checked, door_lock_checked, meal_id, memo
+                gap_block_checked, door_lock_checked, meal_id, memo, photo_uri
          FROM daily_logs
          ORDER BY date ASC, pet_id ASC`
       ),
@@ -31,6 +32,7 @@ export async function buildBackupObject() {
          ORDER BY id ASC`
       ),
       getAllSettings(),
+      listPets(true),
     ]);
 
   return {
@@ -41,6 +43,7 @@ export async function buildBackupObject() {
     custom_meals: custom_meals ?? [],
     maintenance_logs: maintenance_logs ?? [],
     settings: settings ?? {},
+    pets: pets ?? [],
   };
 }
 
@@ -56,7 +59,8 @@ export function parseBackupJson(raw) {
   if (!data || data.format !== BACKUP_FORMAT) {
     throw new Error('対応していないバックアップ形式です');
   }
-  if (Number(data.version) !== BACKUP_VERSION) {
+  const ver = Number(data.version);
+  if (ver !== 1 && ver !== 2) {
     throw new Error(`未対応のバックアップ版です: ${data.version}`);
   }
   if (!Array.isArray(data.daily_logs) || !Array.isArray(data.custom_meals)) {
@@ -65,7 +69,7 @@ export function parseBackupJson(raw) {
   return data;
 }
 
-async function upsertMealByName(name) {
+async function upsertMealByName(name, pinned = 0, last_used_at = null) {
   const db = getDatabase();
   const trimmed = String(name ?? '').trim();
   if (!trimmed) return null;
@@ -73,10 +77,16 @@ async function upsertMealByName(name) {
     `SELECT id FROM custom_meals WHERE name = ?`,
     [trimmed]
   );
-  if (existing?.id != null) return Number(existing.id);
+  if (existing?.id != null) {
+    await db.runAsync(
+      `UPDATE custom_meals SET pinned = ?, last_used_at = COALESCE(?, last_used_at) WHERE id = ?`,
+      [pinned ? 1 : 0, last_used_at, Number(existing.id)]
+    );
+    return Number(existing.id);
+  }
   const result = await db.runAsync(
-    `INSERT INTO custom_meals (name) VALUES (?)`,
-    [trimmed]
+    `INSERT INTO custom_meals (name, pinned, last_used_at) VALUES (?, ?, ?)`,
+    [trimmed, pinned ? 1 : 0, last_used_at]
   );
   return Number(result.lastInsertRowId);
 }
@@ -95,7 +105,30 @@ export async function importBackupObject(data, mode) {
         DELETE FROM daily_logs;
         DELETE FROM custom_meals;
         DELETE FROM maintenance_logs;
+        DELETE FROM pets;
       `);
+    }
+
+    for (const pet of data.pets ?? []) {
+      const id = String(pet.id ?? '').trim();
+      const name = String(pet.name ?? '').trim();
+      if (!id || !name) continue;
+      await db.runAsync(
+        `INSERT INTO pets (id, name, icon_uri, sort_order, retired)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           name = excluded.name,
+           icon_uri = excluded.icon_uri,
+           sort_order = excluded.sort_order,
+           retired = excluded.retired`,
+        [
+          id,
+          name,
+          pet.icon_uri ?? null,
+          Number(pet.sort_order ?? 0),
+          pet.retired ? 1 : 0,
+        ]
+      );
     }
 
     /** @type {Map<number, number>} */
@@ -105,16 +138,21 @@ export async function importBackupObject(data, mode) {
       const name = String(meal.name ?? '').trim();
       if (!name) continue;
       const oldId = meal.id != null ? Number(meal.id) : null;
+      const pinned = meal.pinned ? 1 : 0;
+      const last_used_at = meal.last_used_at ?? null;
 
       if (replace && oldId != null && Number.isFinite(oldId)) {
         await db.runAsync(
-          `INSERT INTO custom_meals (id, name) VALUES (?, ?)
-           ON CONFLICT(id) DO UPDATE SET name = excluded.name`,
-          [oldId, name]
+          `INSERT INTO custom_meals (id, name, pinned, last_used_at) VALUES (?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             name = excluded.name,
+             pinned = excluded.pinned,
+             last_used_at = excluded.last_used_at`,
+          [oldId, name, pinned, last_used_at]
         );
         mealIdMap.set(oldId, oldId);
       } else {
-        const newId = await upsertMealByName(name);
+        const newId = await upsertMealByName(name, pinned, last_used_at);
         if (oldId != null && newId != null) mealIdMap.set(oldId, newId);
       }
     }
@@ -122,8 +160,7 @@ export async function importBackupObject(data, mode) {
     for (const row of data.daily_logs ?? []) {
       const pet_id = row.pet_id;
       const date = row.date;
-      if (pet_id !== 'funu' && pet_id !== 'mumu') continue;
-      if (!date) continue;
+      if (!pet_id || !date) continue;
 
       let meal_id = null;
       if (row.meal_id != null && row.meal_id !== '') {
@@ -146,9 +183,9 @@ export async function importBackupObject(data, mode) {
       await db.runAsync(
         `INSERT INTO daily_logs (
            date, pet_id, weight, heyanpo_start, heyanpo_end,
-           gap_block_checked, door_lock_checked, meal_id, memo
+           gap_block_checked, door_lock_checked, meal_id, memo, photo_uri
          )
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(date, pet_id) DO UPDATE SET
            weight = excluded.weight,
            heyanpo_start = excluded.heyanpo_start,
@@ -156,7 +193,8 @@ export async function importBackupObject(data, mode) {
            gap_block_checked = excluded.gap_block_checked,
            door_lock_checked = excluded.door_lock_checked,
            meal_id = excluded.meal_id,
-           memo = excluded.memo`,
+           memo = excluded.memo,
+           photo_uri = excluded.photo_uri`,
         [
           date,
           pet_id,
@@ -167,6 +205,7 @@ export async function importBackupObject(data, mode) {
           door,
           meal_id,
           row.memo ?? null,
+          row.photo_uri ?? null,
         ]
       );
     }
@@ -192,6 +231,19 @@ export async function importBackupObject(data, mode) {
         [key, value ?? '']
       );
     }
+
+    // v1 バックアップで pets が無い場合のフォールバック
+    const petCount = await db.getFirstAsync(`SELECT COUNT(*) AS c FROM pets`);
+    if (Number(petCount?.c ?? 0) === 0) {
+      await db.runAsync(
+        `INSERT INTO pets (id, name, icon_uri, sort_order, retired) VALUES (?, ?, ?, ?, 0)`,
+        ['funu', 'ふぬ', settings[SETTINGS_KEYS.ICON_FUNU] ?? null, 0]
+      );
+      await db.runAsync(
+        `INSERT INTO pets (id, name, icon_uri, sort_order, retired) VALUES (?, ?, ?, ?, 0)`,
+        ['mumu', 'むむ', settings[SETTINGS_KEYS.ICON_MUMU] ?? null, 1]
+      );
+    }
   });
 }
 
@@ -201,9 +253,6 @@ function csvEscape(v) {
   return s;
 }
 
-/**
- * 体重 CSV（全個体）
- */
 export async function buildWeightCsv() {
   const db = getDatabase();
   const rows = await db.getAllAsync(
@@ -220,9 +269,6 @@ export async function buildWeightCsv() {
   return `${lines.join('\n')}\n`;
 }
 
-/**
- * へやんぽ CSV（全個体）
- */
 export async function buildHeyanpoCsv() {
   const db = getDatabase();
   const rows = await db.getAllAsync(
@@ -253,5 +299,4 @@ export function defaultCsvFileName(kind) {
   return `withham-${kind}-${getLocalDateString()}.csv`;
 }
 
-/** アイコン設定キー（インポート後の再読込用） */
 export { SETTINGS_KEYS };

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
+  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -11,15 +12,20 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
+import { copyAsync, documentDirectory } from 'expo-file-system/legacy';
+import * as ImagePicker from 'expo-image-picker';
 import {
   addCustomMeal,
   getCustomMeals,
   getHeyanpoHistory,
   getLocalDateString,
   getLogByDate,
+  getPhotoHistory,
   getPreviousWeight,
   mergeUpsertDailyLog,
   parseLocalDateString,
+  toggleMealPinned,
+  touchMealUsed,
 } from '../database/db';
 import {
   evaluateWeightDrop,
@@ -69,7 +75,7 @@ function parseWeightInput(text) {
   return Number.isFinite(n) ? n : null;
 }
 
-export function PetObservationCard({ petId, onLogChanged }) {
+export function PetObservationCard({ petId, petName, onLogChanged }) {
   const [recordDateStr, setRecordDateStr] = useState(getLocalDateString());
   const [showRecordDate, setShowRecordDate] = useState(false);
   const [weightText, setWeightText] = useState('');
@@ -80,10 +86,14 @@ export function PetObservationCard({ petId, onLogChanged }) {
   const [sealed, setSealed] = useState(false);
   const [mealId, setMealId] = useState(null);
   const [memoText, setMemoText] = useState('');
+  const [photoUri, setPhotoUri] = useState(null);
+  const [photoHistory, setPhotoHistory] = useState([]);
   const [meals, setMeals] = useState([]);
   const [showStart, setShowStart] = useState(false);
   const [showEnd, setShowEnd] = useState(false);
   const [mealModal, setMealModal] = useState(false);
+  const [pinModal, setPinModal] = useState(false);
+  const [photoGalleryModal, setPhotoGalleryModal] = useState(false);
   const [heyanpoHistoryModal, setHeyanpoHistoryModal] = useState(false);
   const [heyanpoHistory, setHeyanpoHistory] = useState([]);
   const [newMealName, setNewMealName] = useState('');
@@ -93,15 +103,17 @@ export function PetObservationCard({ petId, onLogChanged }) {
   const [savingMemo, setSavingMemo] = useState(false);
 
   const load = useCallback(async () => {
-    const [row, ml, hyHist, prevW] = await Promise.all([
+    const [row, ml, hyHist, prevW, photos] = await Promise.all([
       getLogByDate(petId, recordDateStr),
       getCustomMeals(),
       getHeyanpoHistory(petId, 60),
       getPreviousWeight(petId, recordDateStr),
+      getPhotoHistory(petId, 60),
     ]);
     setMeals(ml);
     setHeyanpoHistory(hyHist);
     setPreviousWeight(prevW);
+    setPhotoHistory(photos);
     if (row) {
       setWeightText(row.weight != null ? String(row.weight) : '');
       const hs = row.heyanpo_start;
@@ -117,6 +129,7 @@ export function PetObservationCard({ petId, onLogChanged }) {
       setSealed(gapOn && doorOn);
       setMealId(row.meal_id != null ? Number(row.meal_id) : null);
       setMemoText(row.memo ?? '');
+      setPhotoUri(row.photo_uri ?? null);
       if (
         row.weight != null &&
         prevW != null &&
@@ -133,6 +146,7 @@ export function PetObservationCard({ petId, onLogChanged }) {
       setSealed(false);
       setMealId(null);
       setMemoText('');
+      setPhotoUri(null);
       setWeightDropAlert(null);
     }
   }, [petId, recordDateStr]);
@@ -276,6 +290,7 @@ export function PetObservationCard({ petId, onLogChanged }) {
     setSavingMeal(true);
     try {
       await mergeUpsertDailyLog(petId, { date: recordDateStr, meal_id: mealId });
+      if (mealId != null) await touchMealUsed(mealId);
       await load();
       Alert.alert('保存しました', '食事メニューを保存しました。');
     } catch (e) {
@@ -284,6 +299,68 @@ export function PetObservationCard({ petId, onLogChanged }) {
       setSavingMeal(false);
     }
   }, [petId, mealId, load, recordDateStr]);
+
+  const pickDayPhoto = useCallback(async () => {
+    try {
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          '許可が必要です',
+          '写真ライブラリへのアクセスを許可してください。'
+        );
+        return;
+      }
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.85,
+      });
+      if (res.canceled) return;
+      if (!documentDirectory) {
+        Alert.alert('保存できません', 'アプリのドキュメント領域を利用できません。');
+        return;
+      }
+      const uri = res.assets[0].uri;
+      const rawExt = uri.split('.').pop()?.split('?')[0] || 'jpg';
+      const ext = /^[a-zA-Z0-9]+$/.test(rawExt) ? rawExt : 'jpg';
+      const dest = `${documentDirectory}day_${petId}_${recordDateStr}_${Date.now()}.${ext}`;
+      await copyAsync({ from: uri, to: dest });
+      await mergeUpsertDailyLog(petId, {
+        date: recordDateStr,
+        photo_uri: dest,
+      });
+      setPhotoUri(dest);
+      await load();
+      onLogChanged?.();
+    } catch (e) {
+      Alert.alert('写真の保存に失敗しました', String(e?.message ?? e));
+    }
+  }, [petId, recordDateStr, load, onLogChanged]);
+
+  const clearDayPhoto = useCallback(async () => {
+    try {
+      await mergeUpsertDailyLog(petId, {
+        date: recordDateStr,
+        photo_uri: null,
+      });
+      setPhotoUri(null);
+      await load();
+    } catch (e) {
+      Alert.alert('削除エラー', String(e?.message ?? e));
+    }
+  }, [petId, recordDateStr, load]);
+
+  const onTogglePin = useCallback(
+    async (id) => {
+      try {
+        await toggleMealPinned(id);
+        setMeals(await getCustomMeals());
+      } catch (e) {
+        Alert.alert('更新エラー', String(e?.message ?? e));
+      }
+    },
+    []
+  );
 
   const saveMemo = useCallback(async () => {
     setSavingMemo(true);
@@ -338,6 +415,7 @@ export function PetObservationCard({ petId, onLogChanged }) {
       setMealModal(false);
       setNewMealName('');
       await mergeUpsertDailyLog(petId, { date: recordDateStr, meal_id: id });
+      await touchMealUsed(id);
       await load();
       Alert.alert('保存しました', 'メニューを追加し、選択状態を保存しました。');
     } catch (e) {
@@ -362,7 +440,7 @@ export function PetObservationCard({ petId, onLogChanged }) {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>{petId === 'funu' ? 'ふぬ' : 'むむ'}</Text>
+      <Text style={styles.cardTitle}>{petName || petId}</Text>
       <Text style={styles.cardSub}>
         各ブロックの「保存」で確定します。安全確認はタップと同時に保存されます。記録日を変えれば過去分も入力できます。
       </Text>
@@ -524,6 +602,9 @@ export function PetObservationCard({ petId, onLogChanged }) {
       </Modal>
 
       <Text style={styles.sectionTitle}>食事メニュー</Text>
+      <Text style={styles.mealHint}>
+        表示順: ピン留め → 最近使った順 → 名前
+      </Text>
       <View style={styles.pickerOuter}>
         <Picker
           selectedValue={pickerVal}
@@ -536,7 +617,7 @@ export function PetObservationCard({ petId, onLogChanged }) {
           {meals.map((m) => (
             <Picker.Item
               key={m.id}
-              label={m.name}
+              label={`${m.pinned ? '★ ' : ''}${m.name}`}
               value={String(m.id)}
               color={FG}
             />
@@ -544,6 +625,13 @@ export function PetObservationCard({ petId, onLogChanged }) {
           <Picker.Item label="＋新しいメニューを追加" value="__add__" color={FG} />
         </Picker>
       </View>
+      <TouchableOpacity
+        style={styles.historyLink}
+        onPress={() => setPinModal(true)}
+        activeOpacity={0.88}
+      >
+        <Text style={styles.historyLinkText}>ピン留めを編集</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity
         style={[styles.sectionSave, savingMeal && styles.sectionSaveDisabled]}
@@ -554,6 +642,40 @@ export function PetObservationCard({ petId, onLogChanged }) {
         <Text style={styles.sectionSaveText}>
           {savingMeal ? '保存中…' : '食事を保存'}
         </Text>
+      </TouchableOpacity>
+
+      <Text style={styles.sectionTitle}>写真</Text>
+      {photoUri ? (
+        <Image source={{ uri: photoUri }} style={styles.dayPhoto} />
+      ) : (
+        <Text style={styles.mealHint}>この日の写真は未設定です</Text>
+      )}
+      <View style={styles.photoBtnRow}>
+        <TouchableOpacity
+          style={styles.photoBtn}
+          onPress={pickDayPhoto}
+          activeOpacity={0.88}
+        >
+          <Text style={styles.photoBtnText}>
+            {photoUri ? '写真を変更' : '写真を追加'}
+          </Text>
+        </TouchableOpacity>
+        {photoUri ? (
+          <TouchableOpacity
+            style={styles.photoBtnGhost}
+            onPress={clearDayPhoto}
+            activeOpacity={0.88}
+          >
+            <Text style={styles.historyLinkText}>削除</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+      <TouchableOpacity
+        style={styles.historyLink}
+        onPress={() => setPhotoGalleryModal(true)}
+        activeOpacity={0.88}
+      >
+        <Text style={styles.historyLinkText}>写真ギャラリーを見る</Text>
       </TouchableOpacity>
 
       <Text style={styles.sectionTitle}>メモ</Text>
@@ -606,6 +728,76 @@ export function PetObservationCard({ petId, onLogChanged }) {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={pinModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPinModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>ピン留め</Text>
+            <ScrollView style={styles.historyScroll}>
+              {meals.length === 0 ? (
+                <Text style={styles.historyEmpty}>メニューがありません</Text>
+              ) : (
+                meals.map((m) => (
+                  <TouchableOpacity
+                    key={m.id}
+                    style={styles.pinRow}
+                    onPress={() => onTogglePin(m.id)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.pinStar}>{m.pinned ? '★' : '☆'}</Text>
+                    <Text style={styles.pinName}>{m.name}</Text>
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+            <TouchableOpacity
+              style={[styles.modalBtn, styles.historyModalClose]}
+              onPress={() => setPinModal(false)}
+            >
+              <Text style={styles.modalBtnText}>閉じる</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={photoGalleryModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPhotoGalleryModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>写真ギャラリー</Text>
+            <ScrollView style={styles.historyScroll}>
+              {photoHistory.length === 0 ? (
+                <Text style={styles.historyEmpty}>写真がありません</Text>
+              ) : (
+                photoHistory.map((r) => (
+                  <View key={r.date} style={styles.galleryRow}>
+                    <Text style={styles.historyDate}>{r.date}</Text>
+                    <Image
+                      source={{ uri: r.photo_uri }}
+                      style={styles.galleryImg}
+                    />
+                  </View>
+                ))
+              )}
+            </ScrollView>
+            <TouchableOpacity
+              style={[styles.modalBtn, styles.historyModalClose]}
+              onPress={() => setPhotoGalleryModal(false)}
+            >
+              <Text style={styles.modalBtnText}>閉じる</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -635,6 +827,68 @@ const styles = StyleSheet.create({
     color: FG,
     marginTop: 8,
     marginBottom: 8,
+  },
+  mealHint: {
+    fontSize: 12,
+    color: FG,
+    opacity: 0.65,
+    marginBottom: 8,
+  },
+  dayPhoto: {
+    width: '100%',
+    height: 180,
+    borderRadius: R_IN,
+    marginBottom: 8,
+    backgroundColor: BG,
+  },
+  photoBtnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 4,
+  },
+  photoBtn: {
+    backgroundColor: FG,
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  photoBtnText: {
+    color: BG,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  photoBtnGhost: {
+    paddingVertical: 8,
+  },
+  pinRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: `${FG}33`,
+    gap: 10,
+  },
+  pinStar: {
+    fontSize: 18,
+    color: FG,
+    width: 24,
+  },
+  pinName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: FG,
+    flex: 1,
+  },
+  galleryRow: {
+    marginBottom: 12,
+  },
+  galleryImg: {
+    width: '100%',
+    height: 160,
+    borderRadius: 16,
+    marginTop: 6,
+    backgroundColor: BG,
   },
   sealMega: {
     borderRadius: 22,
