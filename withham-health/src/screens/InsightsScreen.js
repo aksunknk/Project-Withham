@@ -35,6 +35,7 @@ import {
 import { CompareWeightChart } from '../components/CompareWeightChart';
 import { MonthCalendar } from '../components/MonthCalendar';
 import { getInsightRange, INSIGHT_RANGES } from '../utils/insightRange';
+import { refreshHomeWidget } from '../widget/snapshot';
 
 const BG = '#FDFBF7';
 const CARD = '#F5EFE6';
@@ -249,6 +250,9 @@ function PetInsightBlock({ petId, petName, rangeKey, winW, reloadToken }) {
       }
       closeEdit();
       await load();
+      refreshHomeWidget().catch((e) =>
+        console.warn('[refreshHomeWidget]', e)
+      );
     } catch (e) {
       Alert.alert('保存エラー', String(e?.message ?? e));
     } finally {
@@ -273,6 +277,9 @@ function PetInsightBlock({ petId, petName, rangeKey, winW, reloadToken }) {
             }
             closeEdit();
             await load();
+            refreshHomeWidget().catch((e) =>
+              console.warn('[refreshHomeWidget]', e)
+            );
           } catch (e) {
             Alert.alert('削除エラー', String(e?.message ?? e));
           }

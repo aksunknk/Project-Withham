@@ -5,7 +5,7 @@
     "platforms": [
       "android"
     ],
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -43,6 +43,24 @@
           "icon": "./assets/icon.png",
           "color": "#4A4A4A",
           "defaultChannel": "daily-record"
+        }
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "WithhamStatus",
+              "label": "hunumumuDiary 記録状況",
+              "description": "本日の未記録と前回体重を表示します",
+              "minWidth": "180dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 3,
+              "targetCellHeight": 2,
+              "previewImage": "./assets/widget-preview/withham.png",
+              "updatePeriodMillis": 1800000
+            }
+          ]
         }
       ]
     ],

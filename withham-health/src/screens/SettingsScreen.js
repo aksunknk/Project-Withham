@@ -38,6 +38,7 @@ import {
   setNotificationPrefs,
 } from '../notifications/reminders';
 import { shareTextFile } from '../utils/shareFile';
+import { refreshHomeWidget } from '../widget/snapshot';
 
 const BG = '#FDFBF7';
 const CARD = '#F5EFE6';
@@ -101,6 +102,7 @@ export function SettingsScreen() {
       }
       setPetModal(false);
       await loadPets();
+      await refreshHomeWidget();
     });
   };
 
@@ -119,6 +121,7 @@ export function SettingsScreen() {
             run(async () => {
               await updatePet(pet.id, { retired: next });
               await loadPets();
+              await refreshHomeWidget();
             }),
         },
       ]
@@ -231,6 +234,7 @@ export function SettingsScreen() {
     const data = parseBackupJson(text);
     await importBackupObject(data, mode);
     await rescheduleAllReminders();
+    await refreshHomeWidget();
     Alert.alert(
       'インポート完了',
       mode === 'replace'

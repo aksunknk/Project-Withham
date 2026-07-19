@@ -15,6 +15,7 @@ import { InsightsScreen } from './src/screens/InsightsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { initDB } from './src/database/db';
 import { bootstrapReminders } from './src/notifications/reminders';
+import { refreshHomeWidget } from './src/widget/snapshot';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -87,6 +88,9 @@ export default function App() {
         ]);
         bootstrapReminders().catch((e) =>
           console.warn('[bootstrapReminders]', e)
+        );
+        refreshHomeWidget().catch((e) =>
+          console.warn('[refreshHomeWidget]', e)
         );
         if (active) setDbError(null);
       } catch (e) {

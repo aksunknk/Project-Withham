@@ -20,6 +20,7 @@ import {
 import { MaintenanceSection } from '../components/MaintenanceSection';
 import { PetHeader } from '../components/PetHeader';
 import { PetObservationCard } from '../components/PetObservationCard';
+import { refreshHomeWidget } from '../widget/snapshot';
 
 const BG = '#FDFBF7';
 const CARD = '#F5EFE6';
@@ -54,6 +55,9 @@ export function InputScreen() {
   const refreshCareGaps = useCallback(async () => {
     try {
       setCareGaps(await getTodayCareGaps());
+      refreshHomeWidget().catch((e) =>
+        console.warn('[refreshHomeWidget]', e)
+      );
     } catch (e) {
       console.error('[careGaps]', e);
     }
