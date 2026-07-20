@@ -58,7 +58,12 @@ function formatExecutedStored(iso) {
   return iso;
 }
 
-export function MaintenanceSection() {
+/**
+ * @param {{
+ *   onSaveSnack?: (payload: { message: string, onUndo?: (() => void | Promise<void>) | null }) => void,
+ * }} props
+ */
+export function MaintenanceSection({ onSaveSnack }) {
   const [content, setContent] = useState('');
   const [executedAt, setExecutedAt] = useState(() => new Date());
   const [nextDate, setNextDate] = useState(() => stripTime(new Date()));
@@ -104,17 +109,16 @@ export function MaintenanceSection() {
       setNextDate(stripTime(new Date()));
       await refreshSummary();
       await scheduleMaintenanceReminder(next_scheduled_date);
-      Alert.alert(
-        '保存しました',
-        `お掃除・お手入れを記録しました。\n次回予定日の朝に通知します（${next_scheduled_date}）。`
-      );
+      onSaveSnack?.({
+        message: `お手入れを保存しました（次回通知: ${next_scheduled_date}）`,
+      });
     } catch (e) {
       console.error('[MaintenanceSection save]', e);
       Alert.alert('保存エラー', String(e?.message ?? e));
     } finally {
       setSaving(false);
     }
-  }, [content, executedAt, nextDate, refreshSummary]);
+  }, [content, executedAt, nextDate, refreshSummary, onSaveSnack]);
 
   const openHistory = useCallback(async () => {
     setHistoryModal(true);

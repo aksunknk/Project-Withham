@@ -75,8 +75,25 @@ function parseWeightInput(text) {
   return Number.isFinite(n) ? n : null;
 }
 
-export function PetObservationCard({ petId, petName, onLogChanged }) {
+/**
+ * @param {{
+ *   petId: string,
+ *   petName?: string,
+ *   onLogChanged?: () => void,
+ *   onSaveSnack?: (payload: { message: string, onUndo?: (() => void | Promise<void>) | null }) => void,
+ *   focusRequest?: { petId: string, section: 'weight' | 'safety', token: number } | null,
+ * }} props
+ */
+export function PetObservationCard({
+  petId,
+  petName,
+  onLogChanged,
+  onSaveSnack,
+  focusRequest = null,
+}) {
   const [recordDateStr, setRecordDateStr] = useState(getLocalDateString());
+  /** @type {['weight' | 'safety' | null, Function]} */
+  const [focusPulse, setFocusPulse] = useState(null);
   const [showRecordDate, setShowRecordDate] = useState(false);
   const [weightText, setWeightText] = useState('');
   const [previousWeight, setPreviousWeight] = useState(null);
@@ -155,6 +172,13 @@ export function PetObservationCard({ petId, petName, onLogChanged }) {
     load().catch((e) => console.error('[PetObservationCard load]', e));
   }, [load]);
 
+  useEffect(() => {
+    if (!focusRequest || focusRequest.petId !== petId) return undefined;
+    setFocusPulse(focusRequest.section);
+    const t = setTimeout(() => setFocusPulse(null), 1800);
+    return () => clearTimeout(t);
+  }, [focusRequest?.token, focusRequest?.petId, focusRequest?.section, petId]);
+
   const saveWeight = useCallback(async () => {
     setSavingWeight(true);
     try {
@@ -174,68 +198,82 @@ export function PetObservationCard({ petId, petName, onLogChanged }) {
       setPreviousWeight(await getPreviousWeight(petId, recordDateStr));
       setWeightDropAlert(drop);
 
-      const undoBtn = {
-        text: 'アンドゥ',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await mergeUpsertDailyLog(petId, {
-              date: recordDateStr,
-              weight: prevWeight,
-            });
-            await load();
-          } catch (e) {
-            Alert.alert('アンドゥ失敗', String(e?.message ?? e));
-          }
-        },
+      const undoWeight = async () => {
+        try {
+          await mergeUpsertDailyLog(petId, {
+            date: recordDateStr,
+            weight: prevWeight,
+          });
+          await load();
+          onLogChanged?.();
+        } catch (e) {
+          Alert.alert('アンドゥ失敗', String(e?.message ?? e));
+        }
       };
 
       onLogChanged?.();
       if (drop) {
         Alert.alert('体重が急に減っています', formatWeightDropMessage(drop), [
-          undoBtn,
+          {
+            text: 'アンドゥ',
+            style: 'destructive',
+            onPress: undoWeight,
+          },
           { text: '了解' },
         ]);
       } else {
-        Alert.alert(
-          '保存しました',
-          `体重を記録しました。\n記録日: ${recordDateStr}`,
-          [undoBtn, { text: 'OK' }]
-        );
+        onSaveSnack?.({
+          message: `体重を保存しました（${recordDateStr}）`,
+          onUndo: undoWeight,
+        });
       }
     } catch (e) {
       Alert.alert('保存エラー', String(e?.message ?? e));
     } finally {
       setSavingWeight(false);
     }
-  }, [petId, weightText, recordDateStr, load, onLogChanged]);
+  }, [petId, weightText, recordDateStr, load, onLogChanged, onSaveSnack]);
 
-  const saveHeyanpo = useCallback(async () => {
-    setSavingHeyanpo(true);
-    try {
-      const before = await getLogByDate(petId, recordDateStr);
-      const prevStart = before?.heyanpo_start ?? null;
-      const prevEnd = before?.heyanpo_end ?? null;
-      const partial = {
-        date: recordDateStr,
-        heyanpo_start: dateToTimeDb(startDate),
-        heyanpo_end: dateToTimeDb(endDate),
-      };
-      if (endDate != null) {
-        partial.gap_block_checked = 0;
-        partial.door_lock_checked = 0;
-      }
-      await mergeUpsertDailyLog(petId, partial);
-      if (endDate != null) {
-        setSealed(false);
-      }
-      const hyHist = await getHeyanpoHistory(petId, 60);
-      setHeyanpoHistory(hyHist);
-      Alert.alert('保存しました', `へやんぽを保存しました。\n記録日: ${recordDateStr}`, [
-        {
-          text: 'アンドゥ',
-          style: 'destructive',
-          onPress: async () => {
+  /**
+   * へやんぽを即 DB 反映する（メガタップ / 手動時刻 / 再保存で共通）。
+   * @param {Date | null} nextStart
+   * @param {Date | null} nextEnd
+   * @param {'start' | 'end' | 'adjust'} kind
+   */
+  const persistHeyanpo = useCallback(
+    async (nextStart, nextEnd, kind = 'adjust') => {
+      setSavingHeyanpo(true);
+      try {
+        const before = await getLogByDate(petId, recordDateStr);
+        const prevStart = before?.heyanpo_start ?? null;
+        const prevEnd = before?.heyanpo_end ?? null;
+        const partial = {
+          date: recordDateStr,
+          heyanpo_start: dateToTimeDb(nextStart),
+          heyanpo_end: dateToTimeDb(nextEnd),
+        };
+        if (nextEnd != null) {
+          partial.gap_block_checked = 0;
+          partial.door_lock_checked = 0;
+        }
+        await mergeUpsertDailyLog(petId, partial);
+        if (nextEnd != null) {
+          setSealed(false);
+        }
+        const hyHist = await getHeyanpoHistory(petId, 60);
+        setHeyanpoHistory(hyHist);
+        onLogChanged?.();
+
+        const message =
+          kind === 'start'
+            ? `へやんぽ開始を記録しました（${recordDateStr}）`
+            : kind === 'end'
+              ? `へやんぽを保存しました（${recordDateStr}）`
+              : `へやんぽ時刻を保存しました（${recordDateStr}）`;
+
+        onSaveSnack?.({
+          message,
+          onUndo: async () => {
             try {
               await mergeUpsertDailyLog(petId, {
                 date: recordDateStr,
@@ -243,19 +281,21 @@ export function PetObservationCard({ petId, petName, onLogChanged }) {
                 heyanpo_end: prevEnd,
               });
               await load();
+              onLogChanged?.();
             } catch (e) {
               Alert.alert('アンドゥ失敗', String(e?.message ?? e));
             }
           },
-        },
-        { text: 'OK' },
-      ]);
-    } catch (e) {
-      Alert.alert('保存エラー', String(e?.message ?? e));
-    } finally {
-      setSavingHeyanpo(false);
-    }
-  }, [petId, startDate, endDate, recordDateStr, load]);
+        });
+      } catch (e) {
+        Alert.alert('保存エラー', String(e?.message ?? e));
+        await load();
+      } finally {
+        setSavingHeyanpo(false);
+      }
+    },
+    [petId, recordDateStr, load, onLogChanged, onSaveSnack]
+  );
 
   const onSealedToggle = useCallback(async () => {
     const prev = sealed;
@@ -275,16 +315,19 @@ export function PetObservationCard({ petId, petName, onLogChanged }) {
   }, [petId, sealed, recordDateStr, onLogChanged]);
 
   const onHeyanpoMegaTap = useCallback(() => {
+    if (savingHeyanpo) return;
     const now = new Date();
     if (startDate == null || (startDate != null && endDate != null)) {
       setStartDate(now);
       setEndDate(null);
+      persistHeyanpo(now, null, 'start');
       return;
     }
     if (startDate != null && endDate == null) {
       setEndDate(now);
+      persistHeyanpo(startDate, now, 'end');
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, savingHeyanpo, persistHeyanpo]);
 
   const saveMeal = useCallback(async () => {
     setSavingMeal(true);
@@ -292,13 +335,13 @@ export function PetObservationCard({ petId, petName, onLogChanged }) {
       await mergeUpsertDailyLog(petId, { date: recordDateStr, meal_id: mealId });
       if (mealId != null) await touchMealUsed(mealId);
       await load();
-      Alert.alert('保存しました', '食事メニューを保存しました。');
+      onSaveSnack?.({ message: '食事メニューを保存しました' });
     } catch (e) {
       Alert.alert('保存エラー', String(e?.message ?? e));
     } finally {
       setSavingMeal(false);
     }
-  }, [petId, mealId, load, recordDateStr]);
+  }, [petId, mealId, load, recordDateStr, onSaveSnack]);
 
   const pickDayPhoto = useCallback(async () => {
     try {
@@ -372,30 +415,26 @@ export function PetObservationCard({ petId, petName, onLogChanged }) {
         memo: memoText.trim() || null,
       });
       await load();
-      Alert.alert('保存しました', `メモを保存しました。\n記録日: ${recordDateStr}`, [
-        {
-          text: 'アンドゥ',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await mergeUpsertDailyLog(petId, {
-                date: recordDateStr,
-                memo: prevMemo,
-              });
-              await load();
-            } catch (e) {
-              Alert.alert('アンドゥ失敗', String(e?.message ?? e));
-            }
-          },
+      onSaveSnack?.({
+        message: `メモを保存しました（${recordDateStr}）`,
+        onUndo: async () => {
+          try {
+            await mergeUpsertDailyLog(petId, {
+              date: recordDateStr,
+              memo: prevMemo,
+            });
+            await load();
+          } catch (e) {
+            Alert.alert('アンドゥ失敗', String(e?.message ?? e));
+          }
         },
-        { text: 'OK' },
-      ]);
+      });
     } catch (e) {
       Alert.alert('保存エラー', String(e?.message ?? e));
     } finally {
       setSavingMemo(false);
     }
-  }, [petId, memoText, load, recordDateStr]);
+  }, [petId, memoText, load, recordDateStr, onSaveSnack]);
 
   const onPickerChange = (v) => {
     if (v === '__add__') {
@@ -417,7 +456,9 @@ export function PetObservationCard({ petId, petName, onLogChanged }) {
       await mergeUpsertDailyLog(petId, { date: recordDateStr, meal_id: id });
       await touchMealUsed(id);
       await load();
-      Alert.alert('保存しました', 'メニューを追加し、選択状態を保存しました。');
+      onSaveSnack?.({
+        message: 'メニューを追加し、選択状態を保存しました',
+      });
     } catch (e) {
       Alert.alert('追加できませんでした', String(e?.message ?? e));
     }
@@ -426,35 +467,45 @@ export function PetObservationCard({ petId, petName, onLogChanged }) {
   const pickerVal = mealId == null ? '' : String(mealId);
   const isToday = recordDateStr === getLocalDateString();
 
-  const heyanpoPhaseLabel =
-    startDate == null || (startDate != null && endDate != null)
-      ? 'タップで開始時刻を記録'
-      : '進行中 · タップで終了時刻を記録';
+  const heyanpoInProgress = startDate != null && endDate == null;
+
+  const heyanpoPhaseLabel = savingHeyanpo
+    ? '保存中…'
+    : startDate == null || (startDate != null && endDate != null)
+      ? 'タップで開始（自動保存）'
+      : '進行中 · タップで終了して保存';
 
   const heyanpoDetail =
     startDate == null && endDate == null
       ? isToday
-        ? 'ストップウォッチ形式で本日のへやんぽを記録します。'
-        : `ストップウォッチ形式で ${recordDateStr} のへやんぽを記録します。`
-      : `開始 ${dateToTimeLabel(startDate)} ／ 終了 ${dateToTimeLabel(endDate)}`;
+        ? '開始・終了のたびに自動で保存されます。'
+        : `${recordDateStr} のへやんぽを記録します。開始・終了で自動保存されます。`
+      : `開始 ${dateToTimeLabel(startDate)} ／ 終了 ${dateToTimeLabel(endDate)}${
+          heyanpoInProgress ? '（進行中・端末に保存済み）' : ''
+        }`;
 
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>{petName || petId}</Text>
       <Text style={styles.cardSub}>
-        各ブロックの「保存」で確定します。安全確認はタップと同時に保存されます。記録日を変えれば過去分も入力できます。
+        各ブロックの「保存」で確定します。成功時は画面下に短く表示され、体重・へやんぽ・メモはアンドゥできます。安全確認はタップと同時に保存されます。
       </Text>
 
-      <WeightSection
-        weightText={weightText}
-        onChangeWeight={setWeightText}
-        recordDateStr={recordDateStr}
-        onPressRecordDate={() => setShowRecordDate(true)}
-        onSaveWeight={saveWeight}
-        savingWeight={savingWeight}
-        previousWeight={previousWeight}
-        weightDropAlert={weightDropAlert}
-      />
+      <View
+        style={focusPulse === 'weight' ? styles.focusPulse : null}
+        accessibilityLiveRegion="polite"
+      >
+        <WeightSection
+          weightText={weightText}
+          onChangeWeight={setWeightText}
+          recordDateStr={recordDateStr}
+          onPressRecordDate={() => setShowRecordDate(true)}
+          onSaveWeight={saveWeight}
+          savingWeight={savingWeight}
+          previousWeight={previousWeight}
+          weightDropAlert={weightDropAlert}
+        />
+      </View>
       {showRecordDate && (
         <DateTimePicker
           value={parseLocalDateString(recordDateStr)}
@@ -468,38 +519,43 @@ export function PetObservationCard({ petId, petName, onLogChanged }) {
         />
       )}
 
-      <Text style={styles.sectionTitle}>安全確認（隙間・戸締まり）</Text>
-      <TouchableOpacity
-        style={[
-          styles.sealMega,
-          { backgroundColor: sealed ? SEAL_ON : SEAL_OFF },
-        ]}
-        onPress={onSealedToggle}
-        activeOpacity={0.92}
-      >
-        <Text style={styles.sealMegaTitle}>
-          {sealed ? '安全確保' : '開放中'}
-        </Text>
-        <Text style={styles.sealMegaSub}>
-          {sealed
-            ? '隙間と戸締まりの安全を確認しました'
-            : '隙間・出入口の状態を確認のうえ、タップで安全確保に切り替えてください'}
-        </Text>
-      </TouchableOpacity>
+      <View style={focusPulse === 'safety' ? styles.focusPulse : null}>
+        <Text style={styles.sectionTitle}>安全確認（隙間・戸締まり）</Text>
+        <TouchableOpacity
+          style={[
+            styles.sealMega,
+            { backgroundColor: sealed ? SEAL_ON : SEAL_OFF },
+          ]}
+          onPress={onSealedToggle}
+          activeOpacity={0.92}
+        >
+          <Text style={styles.sealMegaTitle}>
+            {sealed ? '安全確保' : '開放中'}
+          </Text>
+          <Text style={styles.sealMegaSub}>
+            {sealed
+              ? '隙間と戸締まりの安全を確認しました'
+              : '隙間・出入口の状態を確認のうえ、タップで安全確保に切り替えてください'}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       <Text style={styles.sectionTitle}>へやんぽ（室内散歩）</Text>
       <TouchableOpacity
         style={[
           styles.heyanpoMega,
           {
-            backgroundColor:
-              startDate != null && endDate == null
-                ? HEYANPO_ACTIVE
-                : HEYANPO_IDLE,
+            backgroundColor: heyanpoInProgress
+              ? HEYANPO_ACTIVE
+              : HEYANPO_IDLE,
           },
+          savingHeyanpo && styles.sectionSaveDisabled,
         ]}
         onPress={onHeyanpoMegaTap}
+        disabled={savingHeyanpo}
         activeOpacity={0.9}
+        accessibilityRole="button"
+        accessibilityLabel={heyanpoPhaseLabel}
       >
         <Text style={styles.heyanpoMegaPhase}>{heyanpoPhaseLabel}</Text>
         <Text style={styles.heyanpoMegaDetail}>{heyanpoDetail}</Text>
@@ -509,6 +565,7 @@ export function PetObservationCard({ petId, petName, onLogChanged }) {
         style={styles.manualLink}
         onPress={() => setShowStart(true)}
         activeOpacity={0.88}
+        disabled={savingHeyanpo}
       >
         <Text style={styles.manualLinkText}>開始時刻を手動で調整</Text>
       </TouchableOpacity>
@@ -520,7 +577,9 @@ export function PetObservationCard({ petId, petName, onLogChanged }) {
           display="default"
           onChange={(_, date) => {
             setShowStart(false);
-            if (date) setStartDate(date);
+            if (!date) return;
+            setStartDate(date);
+            persistHeyanpo(date, endDate, 'adjust');
           }}
         />
       )}
@@ -529,6 +588,7 @@ export function PetObservationCard({ petId, petName, onLogChanged }) {
         style={styles.manualLink}
         onPress={() => setShowEnd(true)}
         activeOpacity={0.88}
+        disabled={savingHeyanpo}
       >
         <Text style={styles.manualLinkText}>終了時刻を手動で調整</Text>
       </TouchableOpacity>
@@ -540,21 +600,14 @@ export function PetObservationCard({ petId, petName, onLogChanged }) {
           display="default"
           onChange={(_, date) => {
             setShowEnd(false);
-            if (date) setEndDate(date);
+            if (!date) return;
+            const nextStart = startDate ?? date;
+            if (startDate == null) setStartDate(date);
+            setEndDate(date);
+            persistHeyanpo(nextStart, date, 'end');
           }}
         />
       )}
-
-      <TouchableOpacity
-        style={[styles.sectionSave, savingHeyanpo && styles.sectionSaveDisabled]}
-        onPress={saveHeyanpo}
-        disabled={savingHeyanpo}
-        activeOpacity={0.9}
-      >
-        <Text style={styles.sectionSaveText}>
-          {savingHeyanpo ? '保存中…' : 'へやんぽを保存'}
-        </Text>
-      </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.historyLink}
@@ -813,6 +866,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: FG,
     marginBottom: 4,
+  },
+  focusPulse: {
+    borderWidth: 2,
+    borderColor: FG,
+    borderRadius: R_IN,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    marginHorizontal: -8,
+    marginBottom: 4,
+    backgroundColor: 'rgba(74,74,74,0.06)',
   },
   cardSub: {
     fontSize: 13,

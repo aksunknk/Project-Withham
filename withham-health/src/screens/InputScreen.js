@@ -4,6 +4,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -20,6 +21,7 @@ import {
 import { MaintenanceSection } from '../components/MaintenanceSection';
 import { PetHeader } from '../components/PetHeader';
 import { PetObservationCard } from '../components/PetObservationCard';
+import { SaveSnack } from '../components/SaveSnack';
 import { refreshHomeWidget } from '../widget/snapshot';
 
 const BG = '#FDFBF7';
@@ -37,11 +39,32 @@ function formatCareGapLine(gap) {
 export function InputScreen() {
   const insets = useSafeAreaInsets();
   const { width: winW } = useWindowDimensions();
+  const verticalScrollRef = useRef(null);
   const pagerRef = useRef(null);
+  const pagerOffsetY = useRef(0);
   const petIdRef = useRef(null);
   const [pets, setPets] = useState([]);
   const [activePetId, setActivePetId] = useState(null);
   const [careGaps, setCareGaps] = useState([]);
+  const [saveSnack, setSaveSnack] = useState(null);
+  /** @type {[{ petId: string, section: 'weight' | 'safety', token: number } | null, Function]} */
+  const [focusRequest, setFocusRequest] = useState(null);
+
+  const showSaveSnack = useCallback((payload) => {
+    if (!payload?.message) {
+      setSaveSnack(null);
+      return;
+    }
+    setSaveSnack({
+      id: Date.now(),
+      message: payload.message,
+      onUndo: payload.onUndo ?? null,
+    });
+  }, []);
+
+  const dismissSaveSnack = useCallback(() => {
+    setSaveSnack(null);
+  }, []);
 
   const refreshPets = useCallback(async () => {
     const list = await listActivePets();
@@ -87,6 +110,27 @@ export function InputScreen() {
       });
     },
     [pets, winW]
+  );
+
+  const onCareGapPress = useCallback(
+    (gap) => {
+      goToPet(gap.pet_id);
+      const section = gap.missingWeight ? 'weight' : 'safety';
+      setFocusRequest({
+        petId: gap.pet_id,
+        section,
+        token: Date.now(),
+      });
+      requestAnimationFrame(() => {
+        const base = Math.max(0, pagerOffsetY.current - 8);
+        const bias = section === 'safety' ? 200 : 0;
+        verticalScrollRef.current?.scrollTo({
+          y: base + bias,
+          animated: true,
+        });
+      });
+    },
+    [goToPet]
   );
 
   useEffect(() => {
@@ -157,6 +201,7 @@ export function InputScreen() {
     <View style={[styles.screen, { paddingTop: padTop }]}>
       <StatusBar style="dark" />
       <ScrollView
+        ref={verticalScrollRef}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -170,10 +215,19 @@ export function InputScreen() {
           <View style={[styles.padded, styles.gapWrap]}>
             <View style={styles.gapBanner}>
               <Text style={styles.gapTitle}>本日まだの記録があります</Text>
+              <Text style={styles.gapHint}>行をタップするとその個体へ移動します</Text>
               {careGaps.map((g) => (
-                <Text key={g.pet_id} style={styles.gapLine}>
-                  {formatCareGapLine(g)}
-                </Text>
+                <TouchableOpacity
+                  key={g.pet_id}
+                  style={styles.gapRow}
+                  onPress={() => onCareGapPress(g)}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${formatCareGapLine(g)}。タップで移動`}
+                >
+                  <Text style={styles.gapLine}>{formatCareGapLine(g)}</Text>
+                  <Text style={styles.gapChevron}>›</Text>
+                </TouchableOpacity>
               ))}
             </View>
           </View>
@@ -200,33 +254,58 @@ export function InputScreen() {
           </Text>
         ) : null}
 
-        <ScrollView
-          ref={pagerRef}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          onMomentumScrollEnd={onPagerMomentumEnd}
-          nestedScrollEnabled
-          style={styles.pager}
+        <View
+          onLayout={(e) => {
+            pagerOffsetY.current = e.nativeEvent.layout.y;
+          }}
         >
-          {pets.map((pet) => (
-            <View key={pet.id} style={[styles.page, { width: winW }]}>
-              <View style={styles.pageInner}>
-                <PetObservationCard
-                  petId={pet.id}
-                  petName={pet.name}
-                  onLogChanged={refreshCareGaps}
-                />
+          <ScrollView
+            ref={pagerRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            onMomentumScrollEnd={onPagerMomentumEnd}
+            nestedScrollEnabled
+            style={styles.pager}
+          >
+            {pets.map((pet) => (
+              <View key={pet.id} style={[styles.page, { width: winW }]}>
+                <View style={styles.pageInner}>
+                  <PetObservationCard
+                    petId={pet.id}
+                    petName={pet.name}
+                    onLogChanged={refreshCareGaps}
+                    onSaveSnack={showSaveSnack}
+                    focusRequest={focusRequest}
+                  />
+                </View>
               </View>
-            </View>
-          ))}
-        </ScrollView>
+            ))}
+          </ScrollView>
+        </View>
 
         <View style={styles.padded}>
-          <MaintenanceSection />
+          <MaintenanceSection onSaveSnack={showSaveSnack} />
         </View>
       </ScrollView>
+
+      {saveSnack ? (
+        <View
+          style={[
+            styles.snackDock,
+            { bottom: Math.max(insets.bottom, 8) + 8 },
+          ]}
+          pointerEvents="box-none"
+        >
+          <SaveSnack
+            key={saveSnack.id}
+            message={saveSnack.message}
+            onUndo={saveSnack.onUndo ?? null}
+            onDismiss={dismissSaveSnack}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -235,6 +314,12 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: BG,
+  },
+  snackDock: {
+    position: 'absolute',
+    left: H_PAD,
+    right: H_PAD,
+    zIndex: 20,
   },
   scrollContent: {
     paddingBottom: 24,
@@ -264,13 +349,36 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: FG,
-    marginBottom: 6,
+    marginBottom: 4,
+  },
+  gapHint: {
+    fontSize: 11,
+    color: FG,
+    opacity: 0.55,
+    marginBottom: 8,
+  },
+  gapRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    marginHorizontal: -4,
+    borderRadius: 10,
   },
   gapLine: {
+    flex: 1,
     fontSize: 13,
     color: FG,
-    opacity: 0.85,
+    opacity: 0.9,
     lineHeight: 19,
+    fontWeight: '600',
+  },
+  gapChevron: {
+    fontSize: 20,
+    color: FG,
+    opacity: 0.45,
+    marginLeft: 8,
+    lineHeight: 22,
   },
   emptyPets: {
     fontSize: 14,
